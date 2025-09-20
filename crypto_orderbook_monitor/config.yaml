@@ -1,0 +1,22 @@
+# Exchange Configuration
+exchanges:
+  - name: "binance"
+    enabled: true
+  - name: "okx"
+    enabled: true
+  - name: "coinbase"
+    enabled: true
+
+# Trading Pairs to Monitor
+trading_pairs:
+  - "SOL/USDT"
+  - "DOT/USDT"
+  - "WIF/USDT"
+
+# Monitoring Settings
+refresh_rate: 1  # seconds
+threshold_percentage: 0.5  # minimum price difference percentage to alert
+
+# Logging
+log_level: "INFO"
+log_file: "orderbook_monitor.log"
