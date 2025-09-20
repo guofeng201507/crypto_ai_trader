@@ -1,0 +1,16 @@
+2025-09-20 16:23:55.030 | INFO     | utils.logger:__init__:38 - LogManager initialized
+2025-09-20 16:23:55.031 | INFO     | __main__:demo_logging:126 - This is an info message from the demo
+2025-09-20 16:23:55.031 | WARNING  | __main__:demo_logging:127 - This is a warning message from the demo
+2025-09-20 16:23:55.031 | ERROR    | __main__:demo_logging:128 - This is an error message from the demo
+2025-09-20 16:23:55.046 | INFO     | data.data_fetcher:_initialize_exchanges:34 - Initialized exchange: binance
+2025-09-20 16:24:48.998 | INFO     | utils.logger:__init__:38 - LogManager initialized
+2025-09-20 16:24:49.004 | INFO     | __main__:demo_logging:140 - This is an info message from the demo
+2025-09-20 16:24:49.005 | WARNING  | __main__:demo_logging:141 - This is a warning message from the demo
+2025-09-20 16:24:49.005 | ERROR    | __main__:demo_logging:142 - This is an error message from the demo
+2025-09-20 16:24:49.031 | INFO     | data.data_fetcher:_initialize_exchanges:34 - Initialized exchange: binance
+2025-09-20 16:24:51.846 | INFO     | strategies.backtester:run_backtest:45 - Starting backtest for Moving Average Crossover on BTC/USDT
+2025-09-20 16:24:51.932 | INFO     | strategies.backtester:run_backtest:112 - Backtest completed. Total return: 0.00%
+2025-09-20 16:24:51.932 | INFO     | strategies.backtester:run_backtest:45 - Starting backtest for Moving Average Crossover on BTC/USDT
+2025-09-20 16:24:51.992 | INFO     | strategies.backtester:run_backtest:112 - Backtest completed. Total return: 0.00%
+2025-09-20 16:24:51.992 | INFO     | strategies.backtester:run_backtest:45 - Starting backtest for RSI Strategy on BTC/USDT
+2025-09-20 16:24:52.165 | INFO     | strategies.backtester:run_backtest:112 - Backtest completed. Total return: 0.00%
