@@ -19,7 +19,7 @@ class TestStrategies(unittest.TestCase):
     def setUp(self):
         """Set up test data."""
         # Create sample data for testing
-        dates = pd.date_range('2023-01-01', periods=100, freq='H')
+        dates = pd.date_range('2023-01-01', periods=100, freq='h')
         self.sample_data = pd.DataFrame({
             'open': np.linspace(20000, 25000, 100),
             'high': np.linspace(20100, 25100, 100),
@@ -51,7 +51,7 @@ class TestStrategies(unittest.TestCase):
             np.linspace(25000, 24500, 50)   # Small retracement
         ])
         
-        dates = pd.date_range('2023-01-01', periods=100, freq='H')
+        dates = pd.date_range('2023-01-01', periods=100, freq='h')
         uptrend_data = pd.DataFrame({
             'close': uptrend_prices,
             'volume': np.linspace(1000, 2000, 100)
@@ -72,7 +72,7 @@ class TestStrategies(unittest.TestCase):
             np.linspace(20000, 20500, 50)   # Small recovery
         ])
         
-        dates = pd.date_range('2023-01-01', periods=100, freq='H')
+        dates = pd.date_range('2023-01-01', periods=100, freq='h')
         downtrend_data = pd.DataFrame({
             'close': downtrend_prices,
             'volume': np.linspace(1000, 2000, 100)
