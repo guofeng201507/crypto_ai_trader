@@ -8,6 +8,8 @@ import asyncio
 import yaml
 import sys
 import os
+import signal
+import functools
 
 from src.exchanges.binance import BinanceExchange
 from src.exchanges.okx import OkxExchange
@@ -15,9 +17,18 @@ from src.exchanges.coinbase import CoinbaseExchange
 from src.utils.config_manager import ConfigManager
 from loguru import logger
 
+# Global flag for kill switch
+kill_switch_activated = False
+
 
 async def main():
     """Main function to run the orderbook monitor"""
+    global kill_switch_activated
+    
+    # Set up signal handlers for graceful shutdown
+    signal.signal(signal.SIGINT, functools.partial(signal_handler, 'SIGINT'))
+    signal.signal(signal.SIGTERM, functools.partial(signal_handler, 'SIGTERM'))
+    
     try:
         # Load configuration
         config_manager = ConfigManager('config.yaml')
@@ -72,7 +83,7 @@ async def main():
         # Monitor loop
         iteration = 0
         try:
-            while True:
+            while not kill_switch_activated:
                 iteration += 1
                 logger.debug(f"Starting iteration {iteration}")
                 
@@ -110,6 +121,15 @@ async def main():
     except Exception as e:
         logger.error(f"Fatal error in main function: {e}")
         raise
+    finally:
+        logger.info("Crypto Orderbook Monitor stopped")
+
+
+def signal_handler(signum, frame, signame):
+    """Handle shutdown signals"""
+    global kill_switch_activated
+    logger.info(f"Received {signame}, activating kill switch...")
+    kill_switch_activated = True
 
 
 def detect_discrepancies(orderbooks, threshold_percentage):
@@ -173,15 +193,69 @@ def detect_discrepancies(orderbooks, threshold_percentage):
                 tradable_volume = min(max_bid_volume, min_ask_volume)
                 potential_profit = discrepancy * tradable_volume
                 
+                # Calculate deeper orderbook analysis for more accurate profit estimation
+                weighted_bid_price = calculate_weighted_price(orderbooks[max_bid_exchange][pair]['bids'], min_ask_volume)
+                weighted_ask_price = calculate_weighted_price(orderbooks[min_ask_exchange][pair]['asks'], max_bid_volume)
+                
+                if weighted_bid_price and weighted_ask_price:
+                    weighted_discrepancy = weighted_bid_price - weighted_ask_price
+                    weighted_profit = weighted_discrepancy * tradable_volume
+                else:
+                    weighted_profit = potential_profit
+                
                 logger.info(f"ARBITRAGE OPPORTUNITY - {pair}:")
                 logger.info(f"  Buy  on {min_ask_exchange} at ${min_ask_price:.4f} (vol: {min_ask_volume})")
                 logger.info(f"  Sell on {max_bid_exchange} at ${max_bid_price:.4f} (vol: {max_bid_volume})")
                 logger.info(f"  Profit: ${discrepancy:.4f} ({discrepancy_percentage:.2f}%)")
                 logger.info(f"  Potential profit for {tradable_volume}: ${potential_profit:.4f}")
+                if weighted_profit != potential_profit:
+                    logger.info(f"  Weighted profit estimation: ${weighted_profit:.4f}")
                 
                 print(f"ARBITRAGE OPPORTUNITY - {pair}:")
                 print(f"  Buy  on {min_ask_exchange} at ${min_ask_price:.4f} (vol: {min_ask_volume})")
                 print(f"  Sell on {max_bid_exchange} at ${max_bid_price:.4f} (vol: {max_bid_volume})")
                 print(f"  Profit: ${discrepancy:.4f} ({discrepancy_percentage:.2f}%)")
                 print(f"  Potential profit for {tradable_volume}: ${potential_profit:.4f}")
+                if weighted_profit != potential_profit:
+                    print(f"  Weighted profit estimation: ${weighted_profit:.4f}")
                 print("-" * 50)
+
+
+def calculate_weighted_price(orders, target_volume):
+    """
+    Calculate weighted average price for a target volume
+    
+    Args:
+        orders (list): List of [price, volume] pairs
+        target_volume (float): Target volume to fill
+        
+    Returns:
+        float: Weighted average price, or None if not enough liquidity
+    """
+    if not orders or target_volume <= 0:
+        return None
+        
+    total_volume = 0
+    total_value = 0
+    
+    for price, volume in orders:
+        if total_volume + volume >= target_volume:
+            # This order will partially fill our target
+            remaining_volume = target_volume - total_volume
+            total_value += price * remaining_volume
+            total_volume += remaining_volume
+            break
+        else:
+            # This order will be fully consumed
+            total_value += price * volume
+            total_volume += volume
+    
+    # If we couldn't fill the target volume, return None
+    if total_volume < target_volume:
+        return None
+        
+    return total_value / total_volume
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

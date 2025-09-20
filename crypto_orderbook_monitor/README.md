@@ -6,9 +6,13 @@ A Python application that monitors orderbooks from multiple cryptocurrency excha
 
 - Real-time monitoring of orderbooks from Binance, OKX, and Coinbase
 - Supports monitoring of SOL/USDT, DOT/USDT, and WIF/USDT trading pairs
-- Detects price discrepancies between exchanges
+- Detects price discrepancies between exchanges with improved accuracy
 - Configurable refresh rate and alert thresholds
 - Detailed logging of arbitrage opportunities
+- Enhanced error handling and graceful shutdown
+- Weighted price calculation for more accurate profit estimation
+- Kill switch functionality for emergency stopping
+- Comprehensive unit tests for core components
 
 ## Prerequisites
 
@@ -43,10 +47,12 @@ Edit the `config.yaml` file to customize the monitoring settings:
 
 Run the monitor:
 ```
-python src/main.py
+python main.py
 ```
 
 The program will continuously monitor the orderbooks and display arbitrage opportunities when detected.
+
+To stop the program gracefully, press `Ctrl+C` or send a SIGTERM signal.
 
 ## How It Works
 
@@ -54,6 +60,7 @@ The program will continuously monitor the orderbooks and display arbitrage oppor
 2. It fetches orderbook data for all configured trading pairs
 3. For each trading pair, it compares the best bid (highest buying price) and best ask (lowest selling price) across exchanges
 4. When the price difference exceeds the configured threshold, it reports an arbitrage opportunity
+5. Enhanced discrepancy detection includes weighted price calculation for more accurate profit estimation
 
 ## Supported Trading Pairs
 
@@ -72,6 +79,13 @@ Note: WIF/USDT might have different naming on different exchanges (e.g., WIF-USD
 ## Logging
 
 The application logs to both console and file (`orderbook_monitor.log` by default). Log level can be configured in `config.yaml`.
+
+## Testing
+
+Run the unit tests:
+```
+python -m pytest tests/
+```
 
 ## Disclaimer
 
