@@ -1,0 +1,27 @@
+# Project Configuration
+
+project_name: "Crypto AI Trader"
+version: "0.1.0"
+description: "An automated cryptocurrency trading system powered by AI"
+
+# Data settings
+data_dir: "data/"
+models_dir: "models/"
+logs_dir: "logs/"
+
+# Exchange settings
+exchanges:
+  - binance
+  - coinbase
+  - kraken
+
+# Default trading pairs
+trading_pairs:
+  - BTC/USDT
+  - ETH/USDT
+  - SOL/USDT
+  - ADA/USDT
+
+# Model settings
+model_type: "lstm"
+prediction_window: 24  # hours

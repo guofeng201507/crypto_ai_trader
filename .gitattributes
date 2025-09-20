@@ -1,0 +1,2 @@
+coolish/*.csv filter=lfs diff=lfs merge=lfs -text
+coolish/*.png filter=lfs diff=lfs merge=lfs -text
