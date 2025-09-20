@@ -4,6 +4,7 @@ Base exchange class
 import ccxt
 import asyncio
 from abc import ABC, abstractmethod
+from loguru import logger
 
 
 class BaseExchange(ABC):
@@ -29,6 +30,9 @@ class BaseExchange(ABC):
             
         Returns:
             dict: Orderbook data
+            
+        Raises:
+            Exception: If there's an error fetching the orderbook
         """
         pass
     
