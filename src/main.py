@@ -131,10 +131,24 @@ def run_training(config):
     logger.info("Training completed")
 
 
+def run_scalping(config):
+    """Run scalping bot mode."""
+    logger.info("Running in scalping mode")
+    
+    # Import and run scalping bot
+    try:
+        import asyncio
+        from scalping_bot import ScalpingBot
+        bot = ScalpingBot('config/config.yaml')
+        asyncio.run(bot.start())
+    except Exception as e:
+        logger.error(f"Failed to start scalping bot: {e}")
+
+
 def main():
     """Main function for the Crypto AI Trader application."""
     parser = argparse.ArgumentParser(description='Crypto AI Trader')
-    parser.add_argument('--mode', choices=['backtest', 'live', 'train'], 
+    parser.add_argument('--mode', choices=['backtest', 'live', 'train', 'scalping'], 
                        default='backtest', help='Execution mode')
     parser.add_argument('--config', default='config/config.yaml', 
                        help='Configuration file path')
@@ -158,6 +172,8 @@ def main():
         run_live_trading(config)
     elif args.mode == 'train':
         run_training(config)
+    elif args.mode == 'scalping':
+        run_scalping(config)
     
     logger.info("Crypto AI Trader finished")
 

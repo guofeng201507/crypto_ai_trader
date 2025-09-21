@@ -25,3 +25,13 @@ trading_pairs:
 # Model settings
 model_type: "lstm"
 prediction_window: 24  # hours
+
+# Scalping bot settings
+scalping:
+  exchange: "binance"
+  profit_target: 0.001    # 0.1% profit target
+  stop_loss: 0.0005      # 0.05% stop loss
+  min_spread: 0.0001     # 0.01% minimum spread
+  max_position_size: 0.01  # 1% of capital per trade
+  initial_capital: 10000.0
+  refresh_rate: 1        # seconds
