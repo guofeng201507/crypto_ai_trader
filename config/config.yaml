@@ -13,7 +13,7 @@ logs_dir: "logs/"
 exchanges:
   - binance
   - coinbase
-  - kraken
+  - okx
 
 # Default trading pairs
 trading_pairs:
