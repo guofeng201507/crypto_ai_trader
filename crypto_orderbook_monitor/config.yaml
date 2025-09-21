@@ -11,12 +11,12 @@ exchanges:
 trading_pairs:
   - "SOL/USDT"
   - "DOT/USDT"
-  - "WIF/USDT"
+  - "ADA/USDT"
 
 # Monitoring Settings
 refresh_rate: 1  # seconds
 threshold_percentage: 0.5  # minimum price difference percentage to alert
 
 # Logging
-log_level: "INFO"
+log_level: "DEBUG"
 log_file: "orderbook_monitor.log"

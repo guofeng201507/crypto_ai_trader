@@ -38,9 +38,8 @@ async def main():
         logger.remove()
         # Get the directory of the current script
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        # Go up one level to project root
-        project_root = os.path.dirname(current_dir)
-        log_file_path = os.path.join(project_root, config['log_file'])
+        # Use current directory for log file
+        log_file_path = os.path.join(current_dir, config['log_file'])
         logger.add(log_file_path, level=config['log_level'], rotation="500 MB")
         logger.add("stderr", level=config['log_level'])
         
