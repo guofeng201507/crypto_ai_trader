@@ -6,7 +6,7 @@ import sys
 import os
 
 # Add the src directory to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from main import detect_discrepancies, calculate_weighted_price
 
@@ -37,7 +37,7 @@ class TestDiscrepancyDetection(unittest.TestCase):
         
         # Test filling partial units
         price = calculate_weighted_price(orders, 1.5)
-        self.assertEqual(price, 100.5)  # (100*1 + 101*0.5) / 1.5
+        self.assertAlmostEqual(price, 100.33333333333333, places=10)  # (100*1 + 101*0.5) / 1.5
     
     def test_calculate_weighted_price_insufficient_liquidity(self):
         """Test calculating weighted price with insufficient liquidity"""
