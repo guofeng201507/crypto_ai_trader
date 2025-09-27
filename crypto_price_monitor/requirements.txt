@@ -1,0 +1,19 @@
+# Requirements for 3-Month High Crypto Price Tracker
+# This extends the main project requirements
+
+# Core dependencies (should already be in main requirements.txt)
+ccxt>=2.0.0
+pandas>=1.5.0
+numpy>=1.24.0
+
+# Configuration and data processing
+pyyaml>=6.0
+
+# Utilities
+python-dotenv>=0.21.0
+
+# Logging
+loguru>=0.6.0
+
+# For notifications
+requests>=2.28.0
