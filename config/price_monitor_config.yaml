@@ -1,0 +1,42 @@
+# Configuration for 3-Month High Crypto Price Tracker
+
+# List of exchanges to monitor
+exchanges: ['binance']
+
+# Trading pairs to monitor
+trading_pairs: ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'DOT/USDT', 'XRP/USDT', 'WLFI/USDT']
+
+# Drop threshold - alert when price drops this percentage from 3-month high
+drop_threshold: 0.2  # 20%
+
+# How often to check prices (in seconds)
+refresh_rate: 60
+
+# Directory for storing data
+data_dir: 'data/'
+
+# Days of historical data to fetch (180 days = 6 months)
+price_history_days: 90
+
+# Timeframe for historical data ('1d', '4h', '1h', etc.)
+timeframe: '1d'
+
+# Notification methods to use ('console', 'file', 'email', 'discord', 'telegram')
+notification_methods: ['console', 'file']
+
+# Email settings (if using email notifications)
+email:
+  smtp_server: 'smtp.gmail.com'  # Example for Gmail
+  smtp_port: 587
+  sender_email: 'your_email@gmail.com'
+  sender_password: 'your_app_password'  # Use app password for Gmail
+  recipients:
+    - 'recipient1@example.com'
+    - 'recipient2@example.com'
+
+# Discord webhook URL (if using Discord notifications)
+discord_webhook_url: ''
+
+# Telegram settings (if using Telegram notifications)
+telegram_bot_token: ''
+telegram_chat_id: ''
