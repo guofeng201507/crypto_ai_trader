@@ -1,7 +1,10 @@
 # Configuration for Crypto News Monitor
 
-# BlockBeats API base URL (placeholder - update with actual API endpoint)
-api_base_url: 'https://api.blockbeats.com'
+# BlockBeats API base URL
+api_base_url: 'https://api.theblockbeats.news'
+
+# API endpoint for flash news (no API key required)
+api_endpoint: '/v2/rss/newsflash'
 
 # API key for BlockBeats (leave empty if no key required)
 api_key: ''

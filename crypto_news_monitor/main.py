@@ -75,7 +75,13 @@ class CryptoNewsMonitorApp:
         if new_articles:
             print(f"\nFound {len(new_articles)} new relevant articles:")
             for article in new_articles:
-                print(f"- {article['title']}")
+                # Handle potential encoding issues when printing Chinese characters
+                title = article['title']
+                try:
+                    print(f"- {title.encode('utf-8').decode('utf-8')}")
+                except (UnicodeEncodeError, UnicodeDecodeError):
+                    print(f"- [Title with special characters]")
+                
                 print(f"  Keywords: {', '.join(article['relevant_keywords'])}")
                 print(f"  URL: {article['url']}")
                 print()
