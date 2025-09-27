@@ -10,7 +10,7 @@ trading_pairs: ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'DOT/USDT', 'XRP/USDT', 'WLF
 drop_threshold: 0.2  # 20%
 
 # How often to check prices (in seconds)
-refresh_rate: 60
+refresh_rate: 1800
 
 # Directory for storing data
 data_dir: 'data/'
@@ -22,7 +22,7 @@ price_history_days: 90
 timeframe: '1d'
 
 # Notification methods to use ('console', 'file', 'email', 'discord', 'telegram')
-notification_methods: ['console', 'file']
+notification_methods: ['console', 'telegram']
 
 # Email settings (if using email notifications)
 email:

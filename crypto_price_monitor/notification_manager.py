@@ -82,17 +82,6 @@ class NotificationManager:
                 f"High Timestamp: {base_message['high_timestamp']}\n"
                 f"Alert Time: {base_message['alert_time']}"
             )
-        elif format_type == "telegram":
-            return (
-                f"🚨 *{base_message['header']}* 🚨\n\n"
-                f"*Symbol:* {base_message['symbol']}\n"
-                f"*Exchange:* {base_message['exchange']}\n"
-                f"*Current Price:* {base_message['current_price']}\n"
-                f"*{self.time_period_desc} High:* {base_message['high_price']}\n"
-                f"*Drop:* {base_message['drop_percentage']}\n"
-                f"*High Time:* {base_message['high_timestamp']}\n"
-                f"*Alert Time:* {base_message['alert_time']}"
-            )
         else:  # default format
             return (
                 f"🚨 {base_message['header']} 🚨\n"
@@ -247,10 +236,28 @@ class NotificationManager:
             logger.warning("Telegram bot token or chat ID not configured, skipping Telegram alert")
             return
         
+        # Ensure chat_id is properly formatted (could be string, integer, or username)
+        # Convert to int if it's a numeric string
+        try:
+            if isinstance(chat_id, str) and chat_id.lstrip('-').isdigit():
+                chat_id = int(chat_id)
+        except ValueError:
+            pass  # If conversion fails, keep original value
+        
         try:
             telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-            # Use the shared template for Telegram format
-            message = self._create_alert_message(alert, "telegram")
+            
+            # Create message with attractive format for Telegram using Markdown
+            message = (
+                f"*🚨 {self.time_period_desc} High Drop Alert 🚨*\n\n"
+                f"*Symbol:* {alert['symbol']}\n"
+                f"*Exchange:* {alert['exchange']}\n"
+                f"*Current Price:* ${alert['current_price']:.4f}\n"
+                f"*{self.time_period_desc} High:* ${alert['three_month_high']:.4f}\n"
+                f"*Drop:* {alert['drop_percentage']:.2f}%\n"
+                f"*High Time:* {alert['high_timestamp']}\n"
+                f"*Alert Time:* {alert['timestamp']}"
+            )
             
             payload = {
                 'chat_id': chat_id,
@@ -258,12 +265,28 @@ class NotificationManager:
                 'parse_mode': 'Markdown'
             }
             
-            response = requests.post(telegram_url, data=payload)
+            response = requests.post(telegram_url, json=payload)
             response.raise_for_status()
             
             logger.info("Telegram alert sent successfully")
         except Exception as e:
             logger.error(f"Failed to send Telegram alert: {e}")
+            # Fallback: try to send a simple message
+            try:
+                simple_message = f"🚨 ALERT: {alert['symbol']} on {alert['exchange']} dropped {alert['drop_percentage']:.2f}% 🚨"
+                payload = {
+                    'chat_id': chat_id,
+                    'text': simple_message,
+                    'parse_mode': 'Markdown'
+                }
+                response = requests.post(telegram_url, json=payload)
+                response.raise_for_status()
+                logger.info("Telegram alert sent with fallback method")
+            except Exception as fallback_error:
+                logger.error(f"Fallback Telegram method also failed: {fallback_error}")
+                # Log more specific details to help debug
+                logger.info(f"Bot token (first 10 chars): {bot_token[:10] if bot_token else 'None'}")
+                logger.info(f"Chat ID: {chat_id} (type: {type(chat_id)})")
     
     def process_alert(self, alert: Dict):
         """
