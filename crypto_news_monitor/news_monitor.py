@@ -27,7 +27,7 @@ class CryptoNewsMonitor:
         self.config = self.load_config(config_path)
         
         # Extract configuration values
-        self.api_base_url = self.config.get('api_base_url', 'https://api.blockbeats.com')
+        self.api_base_url = self.config.get('api_base_url', 'https://api.theblockbeats.news')
         self.api_key = self.config.get('api_key', '')
         self.news_keywords = self.config.get('news_keywords', ['crypto', 'bitcoin', 'ethereum'])
         self.refresh_rate = self.config.get('refresh_rate', 300)  # 5 minutes
@@ -51,13 +51,14 @@ class CryptoNewsMonitor:
             Configuration dictionary
         """
         default_config = {
-            'api_base_url': 'https://api.blockbeats.com',
+            'api_base_url': 'https://api.theblockbeats.news',
             'api_key': '',
             'news_keywords': ['crypto', 'bitcoin', 'ethereum'],
             'refresh_rate': 300,  # seconds
             'data_dir': 'data/',
             'notification_methods': ['console', 'file'],
-            'max_articles_per_cycle': 10
+            'max_articles_per_cycle': 10,
+            'api_endpoint': '/v2/rss/newsflash'  # Flash news endpoint
         }
         
         if config_path and Path(config_path).exists():
@@ -117,7 +118,7 @@ class CryptoNewsMonitor:
     
     def fetch_news(self, keywords: Optional[List[str]] = None) -> List[Dict]:
         """
-        Fetch news from the BlockBeats API based on keywords
+        Fetch flash news from the BlockBeats API
         
         Args:
             keywords: List of keywords to search for (optional, uses default if not provided)
@@ -128,60 +129,149 @@ class CryptoNewsMonitor:
         if keywords is None:
             keywords = self.news_keywords
         
-        # In a real implementation, this would call the BlockBeats API
-        # Since we don't know the exact API structure, I'll create a simulated implementation
-        # and provide the structure that would work with a real API
         try:
-            # This is a placeholder - in a real implementation you would:
-            # headers = {
-            #     'Authorization': f'Bearer {self.api_key}',
-            #     'Content-Type': 'application/json'
-            # }
-            # params = {
-            #     'keywords': ','.join(keywords),
-            #     'limit': self.config.get('max_articles_per_cycle', 10)
-            # }
-            # response = requests.get(f'{self.api_base_url}/news/search', headers=headers, params=params)
+            # Use the actual BlockBeats flash news API endpoint
+            api_endpoint = self.config.get('api_endpoint', '/v2/rss/newsflash')
+            url = f"{self.api_base_url}{api_endpoint}"
             
-            # For now, returning sample data structure
-            sample_news = [
-                {
-                    'id': '1',
-                    'title': 'Bitcoin Reaches New High as Institutional Adoption Grows',
-                    'summary': 'Major financial institutions continue to add Bitcoin to their treasury reserves',
-                    'content': 'Full content of the article about Bitcoin and institutional adoption...',
-                    'url': 'https://blockbeats.com/news/bitcoin-institutional-adoption',
-                    'timestamp': '2025-09-27T22:00:00Z',
-                    'source': 'BlockBeats',
-                    'tags': ['bitcoin', 'institutional', 'adoption']
-                },
-                {
-                    'id': '2',
-                    'title': 'Ethereum 2.0 Upgrade Delivers Promised Improvements',
-                    'summary': 'The latest upgrade to Ethereum has increased transaction speed and reduced fees',
-                    'content': 'Full content of the article about Ethereum 2.0 upgrades...',
-                    'url': 'https://blockbeats.com/news/ethereum-2.0-upgrade',
-                    'timestamp': '2025-09-27T21:30:00Z',
-                    'source': 'BlockBeats',
-                    'tags': ['ethereum', 'upgrade', 'blockchain']
-                }
-            ]
+            # Make request to BlockBeats flash news API
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
             
-            # Filter sample news based on keywords (in a real implementation, this would be done by the API)
-            filtered_news = []
-            for article in sample_news:
-                title_lower = article['title'].lower()
-                summary_lower = article['summary'].lower()
+            # Check the content type to determine how to parse the response
+            content_type = response.headers.get('content-type', '').lower()
+            
+            if 'xml' in content_type or 'rss' in content_type:
+                # Parse as XML/RSS
+                import xml.etree.ElementTree as ET
+                root = ET.fromstring(response.text)
                 
-                for keyword in keywords:
-                    if keyword.lower() in title_lower or keyword.lower() in summary_lower:
-                        filtered_news.append(article)
-                        break
+                articles = []
+                
+                # Find all items in the RSS feed (standard RSS format)
+                for item in root.iter():  # Look for 'item' elements
+                    if item.tag.endswith('item') or item.tag.endswith('entry'):
+                        article = self._parse_rss_item(item)
+                        if article:
+                            # Filter based on keywords
+                            title_lower = article['title'].lower()
+                            summary_lower = article['summary'].lower()
+                            
+                            # Check if any keyword is in the article
+                            keyword_found = False
+                            for keyword in keywords:
+                                if keyword.lower() in title_lower or keyword.lower() in summary_lower:
+                                    keyword_found = True
+                                    break
+                            
+                            if keyword_found:
+                                articles.append(article)
+            else:
+                # Try to parse as JSON
+                try:
+                    data = response.json()
+                    
+                    # Extract articles from the response
+                    articles = []
+                    
+                    # Assuming the API returns a list of news items
+                    if isinstance(data, list):
+                        raw_articles = data
+                    elif isinstance(data, dict) and 'data' in data:
+                        raw_articles = data['data']
+                    else:
+                        raw_articles = [data] if data else []
+                    
+                    for item in raw_articles:
+                        # Normalize the structure based on actual BlockBeats API response
+                        # This is a template - adjust based on actual response format
+                        article = {
+                            'id': str(item.get('id', '')) if item.get('id') else str(hash(str(item))),  # Use hash if no ID
+                            'title': item.get('title', ''),
+                            'summary': item.get('summary', item.get('content', '')),
+                            'content': item.get('content', ''),
+                            'url': item.get('url', ''),
+                            'timestamp': item.get('timestamp', item.get('publish_time', '')),
+                            'source': 'BlockBeats',
+                            'tags': item.get('tags', []) or []
+                        }
+                        
+                        # Filter based on keywords
+                        title_lower = article['title'].lower()
+                        summary_lower = article['summary'].lower()
+                        
+                        # Check if any keyword is in the article
+                        keyword_found = False
+                        for keyword in keywords:
+                            if keyword.lower() in title_lower or keyword.lower() in summary_lower:
+                                keyword_found = True
+                                break
+                        
+                        if keyword_found:
+                            articles.append(article)
+                except ValueError:
+                    # If neither XML nor JSON, return empty list
+                    logger.error("Could not parse response as XML or JSON")
+                    return []
             
-            return filtered_news
+            # Limit the number of articles returned
+            max_articles = self.config.get('max_articles_per_cycle', 10)
+            return articles[:max_articles]
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error fetching news: {e}")
+            return []
         except Exception as e:
             logger.error(f"Error fetching news: {e}")
             return []
+    
+    def _parse_rss_item(self, item):
+        """
+        Parse a single RSS item into article format
+        
+        Args:
+            item: XML element representing an RSS item
+            
+        Returns:
+            Dictionary with article format
+        """
+        try:
+            # Find the specific elements in the RSS item
+            title_elem = item.find('.//title')
+            desc_elem = item.find('.//description') or item.find('.//summary')
+            link_elem = item.find('.//link')
+            pubdate_elem = item.find('.//pubDate') or item.find('.//published')
+            
+            # Extract text content
+            title = title_elem.text if title_elem is not None else ''
+            description = desc_elem.text if desc_elem is not None else ''
+            link = link_elem.text if link_elem is not None else ''
+            pub_date = pubdate_elem.text if pubdate_elem is not None else ''
+            
+            # If link is empty, try to get it from href attribute
+            if not link and link_elem is not None:
+                link = link_elem.get('href') or link_elem.get('url') or ''
+            
+            # Parse link from attribute if it's not in text content
+            if not link:
+                for attr in ['href', 'url', '{http://www.w3.org/1999/xhtml}href']:
+                    if link_elem is not None and link_elem.get(attr):
+                        link = link_elem.get(attr)
+                        break
+            
+            return {
+                'id': str(hash(title + link + pub_date)),  # Create a unique ID based on key fields
+                'title': title,
+                'summary': description,
+                'content': description,  # Same as summary for RSS
+                'url': link,
+                'timestamp': pub_date,
+                'source': 'BlockBeats',
+                'tags': []
+            }
+        except Exception as e:
+            logger.error(f"Error parsing RSS item: {e}")
+            return None
     
     def check_for_new_news(self) -> List[Dict]:
         """
