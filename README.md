@@ -12,6 +12,7 @@ An automated cryptocurrency trading system powered by artificial intelligence an
 - Configuration management system
 - Comprehensive logging and monitoring
 - **NEW: 3-Month High Price Tracker** - Monitors crypto prices dropping 20% from their 3-month highs (configurable)
+- **NEW: Crypto News Monitor** - Tracks cryptocurrency news from BlockBeats API based on user-defined keywords
 - Scalping bot with order book analysis
 
 ## Project Structure
@@ -28,6 +29,7 @@ crypto_ai_trader/
 │   └── utils/                 # Utility functions
 ├── crypto_orderbook_monitor/  # Orderbook monitoring component
 ├── crypto_price_monitor/      # 3-month high price tracker component
+├── crypto_news_monitor/       # Crypto news monitoring component
 ├── tests/                     # Unit tests
 ├── requirements.txt           # Python dependencies
 └── README.md                  # Project documentation
@@ -69,6 +71,33 @@ Edit `config/price_monitor_config.yaml` to customize:
 - Trading pairs to track
 - Drop threshold percentage (default 10%)
 - Time period for historical highs (default 180 days)
+- Notification methods
+
+## New Feature: Crypto News Monitor
+
+The crypto_news_monitor component tracks cryptocurrency news from BlockBeats API:
+
+### Features
+- **Keyword-based Monitoring**: Track news articles containing specific cryptocurrency terms
+- **Real-time Updates**: Continuously checks for new articles at configurable intervals
+- **Configurable Keywords**: Monitor relevant terms like 'bitcoin', 'ethereum', 'defi', etc.
+- **Multiple Notifications**: Supports console and file logging
+- **Deduplication**: Tracks previously seen articles to avoid duplicates
+- **Persistent Storage**: Saves new articles to JSON files
+
+### Usage
+```bash
+# Run continuous monitoring
+python -m crypto_news_monitor.main --config config/news_monitor_config.yaml --mode continuous
+
+# Run single check
+python -m crypto_news_monitor.main --config config/news_monitor_config.yaml --mode single
+```
+
+### Configuration
+Edit `config/news_monitor_config.yaml` to customize:
+- News keywords to monitor
+- Refresh rate for checking new articles
 - Notification methods
 
 ## Dependencies
