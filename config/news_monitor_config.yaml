@@ -1,0 +1,31 @@
+# Configuration for Crypto News Monitor
+
+# BlockBeats API base URL (placeholder - update with actual API endpoint)
+api_base_url: 'https://api.blockbeats.com'
+
+# API key for BlockBeats (leave empty if no key required)
+api_key: ''
+
+# Keywords to monitor in news articles
+news_keywords: 
+  - 'bitcoin'
+  - 'ethereum'
+  - 'crypto'
+  - 'blockchain'
+  - 'defi'
+  - 'nft'
+  - 'altcoin'
+  - 'btc'
+  - 'eth'
+
+# How often to check for news (in seconds)
+refresh_rate: 300  # 5 minutes
+
+# Directory for storing data
+data_dir: 'data/'
+
+# Maximum number of articles to fetch per cycle
+max_articles_per_cycle: 20
+
+# Notification methods to use ('console', 'file')
+notification_methods: ['console', 'file']

@@ -1,0 +1,14 @@
+# Requirements for Crypto News Monitor
+# This extends the main project requirements
+
+# Core dependencies (should already be in main requirements.txt)
+requests>=2.28.0
+
+# Configuration and data processing
+pyyaml>=6.0
+
+# Utilities
+python-dotenv>=0.21.0
+
+# Logging
+loguru>=0.6.0
