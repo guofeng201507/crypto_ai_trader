@@ -403,45 +403,7 @@ class CryptoNewsMonitor:
         if 'telegram' in notification_methods:
             self._send_news_telegram_alert(article)
     
-    def _send_news_telegram_alert(self, article: Dict):
-        """
-        Send news alert via Telegram using the existing notification manager
-        
-        Args:
-            article: Article information
-        """
-        if not self.notification_manager:
-            logger.warning("Notification manager not available, cannot send Telegram alert")
-            return
-            
-        try:
-            # Create a custom message for the news alert
-            title = article['title']
-            url = article['url']
-            keywords = ', '.join(article['relevant_keywords'])
-            
-            # Create news-specific alert that fits the notification manager format
-            alert = {
-                'exchange': 'BlockBeats News',
-                'symbol': f"News: {keywords[:50]}",
-                'current_price': 0,
-                'three_month_high': 0,
-                'drop_percentage': 0,
-                'timestamp': datetime.now().isoformat(),
-                'high_timestamp': article['timestamp'],
-                'title': title,
-                'url': url
-            }
-            
-            # Try to send the alert through the notification manager
-            # But catch exceptions and use fallback if needed
-            self.notification_manager.send_telegram_alert(alert)
-            
-        except Exception as e:
-            logger.error(f"Failed to send news Telegram alert through notification manager: {e}")
-            
-            # Fallback: Direct Telegram API call
-            self._send_custom_telegram_message(article)
+    def _send_news_telegram_alert(self, article: Dict):\n        \"\"\"\n        Send news alert via Telegram using direct API call with proper news formatting\n        \n        Args:\n            article: Article information\n        \"\"\"\n        import requests\n        \n        bot_token = self.config.get('telegram_bot_token', '')\n        chat_id = self.config.get('telegram_chat_id', '')\n        \n        if not bot_token or not chat_id:\n            logger.warning(\"Telegram bot token or chat ID not configured, skipping Telegram alert\")\n            return\n        \n        try:\n            # Ensure chat_id is properly formatted\n            try:\n                if isinstance(chat_id, str) and chat_id.lstrip('-').isdigit():\n                    chat_id = int(chat_id)\n            except ValueError:\n                pass\n            \n            telegram_url = f\"https://api.telegram.org/bot{bot_token}/sendMessage\"\n            \n            # Create news-specific message with proper formatting\n            title = article['title']\n            url = article['url']\n            keywords = ', '.join(article['relevant_keywords'])\n            \n            message = (\n                f\"*🚨 Crypto News Alert 🚨*\\n\\n\"\n                f\"*Keywords:* {keywords}\\n\"\n                f\"*Title:* {title}\\n\"\n                f\"*URL:* {url}\\n\"\n                f\"*Time:* {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\"\n            )\n            \n            payload = {\n                'chat_id': chat_id,\n                'text': message,\n                'parse_mode': 'Markdown'\n            }\n            \n            response = requests.post(telegram_url, json=payload)\n            response.raise_for_status()\n            \n            logger.info(\"News Telegram alert sent successfully\")\n        except Exception as e:\n            logger.error(f\"Failed to send news Telegram alert: {e}\")\n
     
     def _send_custom_telegram_message(self, article: Dict):
         """
