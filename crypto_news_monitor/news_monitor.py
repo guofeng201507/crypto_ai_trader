@@ -260,13 +260,6 @@ class CryptoNewsMonitor:
             if not link and link_elem is not None:
                 link = link_elem.get('href') or link_elem.get('url') or ''
             
-            # Parse link from attribute if it's not in text content
-            if not link:
-                for attr in ['href', 'url', '{http://www.w3.org/1999/xhtml}href']:
-                    if link_elem is not None and link_elem.get(attr):
-                        link = link_elem.get(attr)
-                        break
-            
             return {
                 'id': str(hash(title + link + pub_date)),  # Create a unique ID based on key fields
                 'title': title,
@@ -403,11 +396,9 @@ class CryptoNewsMonitor:
         if 'telegram' in notification_methods:
             self._send_news_telegram_alert(article)
     
-    def _send_news_telegram_alert(self, article: Dict):\n        \"\"\"\n        Send news alert via Telegram using direct API call with proper news formatting\n        \n        Args:\n            article: Article information\n        \"\"\"\n        import requests\n        \n        bot_token = self.config.get('telegram_bot_token', '')\n        chat_id = self.config.get('telegram_chat_id', '')\n        \n        if not bot_token or not chat_id:\n            logger.warning(\"Telegram bot token or chat ID not configured, skipping Telegram alert\")\n            return\n        \n        try:\n            # Ensure chat_id is properly formatted\n            try:\n                if isinstance(chat_id, str) and chat_id.lstrip('-').isdigit():\n                    chat_id = int(chat_id)\n            except ValueError:\n                pass\n            \n            telegram_url = f\"https://api.telegram.org/bot{bot_token}/sendMessage\"\n            \n            # Create news-specific message with proper formatting\n            title = article['title']\n            url = article['url']\n            keywords = ', '.join(article['relevant_keywords'])\n            \n            message = (\n                f\"*🚨 Crypto News Alert 🚨*\\n\\n\"\n                f\"*Keywords:* {keywords}\\n\"\n                f\"*Title:* {title}\\n\"\n                f\"*URL:* {url}\\n\"\n                f\"*Time:* {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\"\n            )\n            \n            payload = {\n                'chat_id': chat_id,\n                'text': message,\n                'parse_mode': 'Markdown'\n            }\n            \n            response = requests.post(telegram_url, json=payload)\n            response.raise_for_status()\n            \n            logger.info(\"News Telegram alert sent successfully\")\n        except Exception as e:\n            logger.error(f\"Failed to send news Telegram alert: {e}\")\n
-    
-    def _send_custom_telegram_message(self, article: Dict):
+    def _send_news_telegram_alert(self, article: Dict):
         """
-        Send custom Telegram message for news alerts using direct API call
+        Send news alert via Telegram using direct API call with proper news formatting
         
         Args:
             article: Article information
@@ -431,7 +422,7 @@ class CryptoNewsMonitor:
             
             telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
             
-            # Create news-specific message
+            # Create news-specific message with proper formatting
             title = article['title']
             url = article['url']
             keywords = ', '.join(article['relevant_keywords'])
@@ -453,9 +444,30 @@ class CryptoNewsMonitor:
             response = requests.post(telegram_url, json=payload)
             response.raise_for_status()
             
-            logger.info("News Telegram alert sent successfully via fallback method")
+            logger.info("News Telegram alert sent successfully")
         except Exception as e:
-            logger.error(f"Failed to send news Telegram alert via fallback method: {e}")
+            logger.error(f"Failed to send news Telegram alert: {e}")
+            # Try fallback with plain text if Markdown fails
+            try:
+                message = (
+                    f"🚨 Crypto News Alert 🚨\n\n"
+                    f"Keywords: {keywords}\n"
+                    f"Title: {title}\n"
+                    f"URL: {url}\n"
+                    f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+                
+                payload = {
+                    'chat_id': chat_id,
+                    'text': message
+                }
+                
+                response = requests.post(telegram_url, json=payload)
+                response.raise_for_status()
+                
+                logger.info("News Telegram alert sent successfully with fallback method")
+            except Exception as fallback_error:
+                logger.error(f"Fallback Telegram method also failed: {fallback_error}")
     
     def _save_article_to_file(self, article: Dict):
         """
