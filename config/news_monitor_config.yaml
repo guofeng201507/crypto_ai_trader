@@ -43,5 +43,8 @@ max_articles_per_cycle: 20
 notification_methods: ['console', 'file', 'telegram']
 
 # Telegram settings (if using Telegram notifications)
-telegram_bot_token: ''
-telegram_chat_id: ''
+#telegram_bot_token: ''
+#telegram_chat_id: ''
+
+telegram_bot_token: '7714408044:AAG3eTvfBGSN2KL92MCuztqO3CY01LXk3ps'
+telegram_chat_id: '-4674558369'
