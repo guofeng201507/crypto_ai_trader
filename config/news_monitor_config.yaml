@@ -39,5 +39,9 @@ data_dir: 'data/'
 # Maximum number of articles to fetch per cycle
 max_articles_per_cycle: 20
 
-# Notification methods to use ('console', 'file')
-notification_methods: ['console', 'file']
+# Notification methods to use ('console', 'file', 'telegram')
+notification_methods: ['console', 'file', 'telegram']
+
+# Telegram settings (if using Telegram notifications)
+telegram_bot_token: ''
+telegram_chat_id: ''
