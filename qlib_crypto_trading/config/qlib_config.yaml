@@ -1,0 +1,92 @@
+# Qlib Configuration for Crypto Trading
+provider_uri: ~/.qlib/qlib_data/cryptocurrency
+region: crypto
+
+market: crypto_all
+
+benchmark: BTC/USDT
+
+# Calendar settings
+calendars:
+  - name: crypto_c
+    freq: 1min
+    future: true
+
+instruments:
+  - name: crypto_all
+    freq: 1min
+    future: true
+
+# Features
+features:
+  - $close
+  - $volume
+  - $high
+  - $low
+  - $open
+  - Ref($close, -1)
+  - Ref($close, -2)
+  - Ref($close, -3)
+  - Ref($close, -5)
+  - Ref($close, -10)
+  - Ref($close, -20)
+  - Ref($close, -30)
+  - (Ref($close, -1) - $close) / $close  # Return
+  - TsMean($close, 5) / $close
+  - TsMean($close, 10) / $close
+  - TsMean($close, 20) / $close
+  - TsStd($close, 5) / $close
+  - TsStd($close, 10) / $close
+  - TsStd($close, 20) / $close
+  - ($close - TsMin($close, 5)) / (TsMax($close, 5) - TsMin($close, 5))  # RSI-like
+  - ($close - TsMin($close, 10)) / (TsMax($close, 10) - TsMin($close, 10))  # RSI-like
+  - TsRank($volume, 5)
+  - TsRank($volume, 10)
+  - TsRank($volume, 20)
+  - $high / $close
+  - $low / $close
+  - ($high - $low) / $close
+  - ($close - $open) / $open
+  - Mean(Ref($close, -1), Ref($close, -2), Ref($close, -3))
+  
+# Task configuration for model training
+task:
+  dataset:
+    class: DatasetH
+    module_path: qlib.data.dataset
+    kwargs:
+      freq: 1min
+      instruments: crypto_all
+      start_time: 2021-01-01
+      end_time: 2024-12-31
+      market: crypto_all
+      benchmark: BTC/USDT
+  dataset_kwargs:
+    handler:
+      class: Alpha158
+      module_path: qlib.contrib.data.handler
+      kwargs:
+        instruments: crypto_all
+        start_time: 2021-01-01
+        end_time: 2024-12-31
+        freq: 1min
+  port_analysis_config:
+    strategy:
+      class: TopkDropoutStrategy
+      module_path: qlib.contrib.strategy
+      kwargs:
+        topk: 50
+        n_drop: 5
+        signal: <PRED>
+    backtest:
+      start_time: 2023-01-01
+      end_time: 2024-12-31
+      account: 1000000
+      benchmark: BTC/USDT
+      exchange_kwargs:
+        freq: 1min
+        limit_threshold: 0.095
+        deal_price: close
+        open_cost: 0.0005
+        close_cost: 0.0015
+        min_cost: 5

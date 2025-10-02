@@ -1,0 +1,68 @@
+# Root level configuration for Qlib Crypto Trading integration
+
+# General settings
+name: "qlib_crypto_trading"
+version: "0.1.0"
+description: "Qlib-based cryptocurrency trading system"
+
+# Qlib settings
+qlib:
+  provider_uri: "~/.qlib/qlib_data/cryptocurrency"
+  region: "crypto"
+  freq: "1min"
+
+# Default paths
+paths:
+  data_dir: "./data"
+  model_dir: "./models"
+  config_dir: "./config"
+  output_dir: "./outputs"
+
+# Supported exchanges
+exchanges:
+  - binance
+  - coinbase
+  - okx
+
+# Default crypto pairs to monitor
+default_crypto_pairs:
+  - BTC/USDT
+  - ETH/USDT
+  - LTC/USDT
+  - XRP/USDT
+  - ADA/USDT
+  - SOL/USDT
+  - DOT/USDT
+  - LINK/USDT
+  - BCH/USDT
+  - BNB/USDT
+
+# Risk management defaults
+risk_management:
+  max_drawdown: 0.2
+  max_position_size: 0.1
+  correlation_threshold: 0.7
+  volatility_threshold: 0.5
+
+# Training defaults
+training:
+  start_date: "2021-01-01"
+  end_date: "2024-12-31"
+  lookback_period: 365  # days
+  validation_split: 0.2
+  test_split: 0.2
+
+# Backtesting defaults
+backtesting:
+  start_date: "2024-01-01"
+  end_date: "2024-12-31"
+  initial_capital: 1000000
+  benchmark: "BTC/USDT"
+  transaction_cost: 0.001  # 0.1% per transaction
+
+# Data settings
+data:
+  default_timeframe: "1h"
+  max_data_points: 100000
+  cache_enabled: true
+  cache_expiry: 86400  # 24 hours in seconds
