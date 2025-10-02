@@ -1,0 +1,106 @@
+# Trading Configuration for Crypto Trading with Qlib
+trading:
+  # General trading parameters
+  start_date: 2023-01-01
+  end_date: 2024-12-31
+  benchmark: BTC/USDT
+  account: 1000000  # Initial capital in USD
+  
+  # Model parameters
+  model:
+    class: LGBModel
+    module_path: qlib.contrib.model.gbdt
+    kwargs:
+      loss: mse
+      n_estimators: 100
+      learning_rate: 0.1
+      num_leaves: 63
+      max_depth: -1
+      feature_fraction: 0.9
+      bagging_fraction: 0.8
+      min_data_in_leaf: 20
+      seed: 42
+
+  # Dataset parameters
+  dataset:
+    class: DatasetH
+    module_path: qlib.data.dataset
+    kwargs:
+      handler:
+        class: Alpha158
+        module_path: qlib.contrib.data.handler
+        kwargs:
+          start_time: 2021-01-01
+          end_time: 2024-12-31
+          freq: 1min
+          inst_processors:
+            - class: Fillna
+              module_path: qlib.data.dataset.inst_processors
+              kwargs: {}
+          dropnan: true
+          segs:
+            train:
+              start_time: 2021-01-01
+              end_time: 2022-12-31
+            valid:
+              start_time: 2023-01-01
+              end_time: 2023-12-31
+            test:
+              start_time: 2024-01-01
+              end_time: 2024-12-31
+
+  # Strategy parameters
+  strategy:
+    class: TopkDropoutStrategy
+    module_path: qlib.contrib.strategy
+    kwargs:
+      topk: 50
+      n_drop: 5
+      signal: <PRED>
+  
+  # Backtest parameters
+  backtest:
+    start_time: 2024-01-01
+    end_time: 2024-12-31
+    account: 1000000
+    benchmark: BTC/USDT
+    exchange_kwargs:
+      freq: 1min
+      limit_threshold: 0.095
+      deal_price: close
+      open_cost: 0.0005
+      close_cost: 0.0015
+      min_cost: 5
+
+  # Risk management
+  risk_management:
+    max_drawdown: 0.2  # 20% maximum drawdown
+    max_position_size: 0.1  # Maximum 10% allocation per position
+    correlation_threshold: 0.7  # Maximum correlation between positions
+    volatility_threshold: 0.5  # Maximum annualized volatility
+
+  # Crypto-specific parameters
+  crypto_specific:
+    supported_exchanges:
+      - binance
+      - coinbase
+      - okx
+    supported_pairs:
+      - BTC/USDT
+      - ETH/USDT
+      - LTC/USDT
+      - XRP/USDT
+      - ADA/USDT
+      - SOL/USDT
+      - DOT/USDT
+      - LINK/USDT
+      - BCH/USDT
+      - BNB/USDT
+    leverage_allowed: false  # Whether to allow leveraged trading
+    min_order_amount: 10  # Minimum order amount in USD
+
+  # Data update settings
+  data_update:
+    refresh_interval: 3600  # Refresh interval in seconds (1 hour)
+    use_cache: true
+    cache_expiry: 86400  # Cache expiry in seconds (24 hours)
