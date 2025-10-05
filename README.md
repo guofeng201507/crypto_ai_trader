@@ -2,6 +2,18 @@
 
 An automated cryptocurrency trading system powered by artificial intelligence and machine learning algorithms.
 
+## Environment Configuration
+
+Create a `.env` file in the root of the project with your API keys and configuration:
+
+```bash
+ALPHA_VANTAGE_API_KEY=your_actual_api_key_here
+SECRET_KEY=your_secret_key_here
+DEBUG=True
+```
+
+For security, the `.env` file is included in `.gitignore` and should not be committed to the repository.
+
 ## Features
 
 - Real-time data fetching from multiple cryptocurrency exchanges

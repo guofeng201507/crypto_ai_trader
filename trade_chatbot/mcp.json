@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "alphavantage": {
+      "type": "jsonrpc",
+      "url": "https://mcp.alphavantage.co/mcp",
+      "headers": {
+        "Authorization": "Bearer 20KCRQCE82CTCDVI",
+        "Content-Type": "application/json"
+      }
+    }
+  }
+}
