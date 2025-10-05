@@ -1,152 +1,457 @@
-# Qwen Agent — Python 自动化加密货币交易规范
+# Qwen Code — Python Coding Standards for Quantitative Trading & AI Agent Development
 
-> 目的：为使用 Qwen/Claude 类大模型驱动的 AI agent 编写 Python 自动交易程序提供一套工程、风控、合规和测试规范。重点覆盖现货与合约的自动化下单、跨交易所低流动性代币套利、回测与仿真、监控与审计。
+> Purpose: Establish comprehensive Python coding standards for quantitative trading systems and AI agent development, following best practices from top quantitative trading firms. This guide ensures code quality, maintainability, performance, and reliability for algorithmic trading systems.
 
 ---
 
-## 1. 适用范围
-- 语言：Python（3.9+）
-- 适配对象：集中化交易所（CEX）与去中心化交易所（DEX）API
-- 交易策略：市价/限价下单、做市、三角/跨所套利、资金费率对冲
-- 不包含：任何形式的市场操纵、洗盘、DDoS、欺诈或规避监管的做法
+## 1. Code Structure and Organization
 
-## 2. 安全与合规（必须遵守）
-1. **遵守交易所规则**：在调用前加载并验证目标交易所的 API 使用条款与限制（速率、合约大小、KYC 要求）。
-2. **权限最小化**：用于自动交易的 API key 应只授予所需权限（通常仅交易/订单权限，不包括提币权限；若需要提币，则单独隔离并多签）。
-3. **风控开关**：实现全局与策略级“杀死开关（kill-switch）”，可在监测到异常时立即停止所有自动下单。
-4. **资金隔离**：测试与生产资金必须严格隔离；任何模拟或回测不得用生产仓位。
-5. **审计日志**：记录所有决策输入（agent prompt、市场快照、模型输出）、签名时间戳、以及最终交易指令。
-6. **人机交互边界**：对高风险操作（大额下单、提币、杠杆调整）要求人工二次确认或多签审批。
-
-## 3. 总体架构（参考）
+### 1.1 Project Layout
 ```
-+----------------------------+
-|  Orchestration / Scheduler |
-+----------------------------+
-           |
-           v
-+----------------+   +-----------------+   +----------------+
-| Market Fetcher |-->|  Agent / LLM    |-->|  Risk Engine   |
-+----------------+   +-----------------+   +----------------+
-           |                 |                    |
-           v                 v                    v
-     Market DB / Cache   Decision Queue     Execution Adapter
-                                   |                    |
-                                   v                    v
-                             Exchange Adapters     Audit Log
-```
-
-### 关键模块说明
-- **Market Fetcher**：聚合多个交易所的深度、逐笔（tape）/逐档（orderbook）数据，保证时序一致性与统一时间戳（UTC）。
-- **Market DB / Cache**：使用时序数据库（例如 ClickHouse / TimescaleDB / Influx）存储分钟级与逐笔市场数据，保留至少 N 个月的交易与回测样本。
-- **Agent / LLM**：负责策略生成与解释（可选），但所有最终下单动作必须由确定性模块（Risk Engine）进行校验。
-- **Risk Engine**：执行头寸限额、滑点估计、最大可承受损失、速率限制、防止重复下单等规则。
-- **Execution Adapter**：封装各交易所 API（REST & WebSocket），实现重试、退避（exponential backoff）与幂等性（idempotency）处理。
-- **Audit Log & Monitoring**：Prometheus + Grafana 指标 + alert（邮件/Slack/Telegram）
-
-## 4. Agent 行为与职责边界
-- **LLM 仅用于**：生成策略候选、解释异常、撰写交易理由、生成回测参数集。
-- **LLM 不直接下单**：模型输出必须转为结构化指令（JSON schema），并通过 deterministic risk engine 校验后才能执行。
-- **Prompt 设计原则**：短、明确、结构化。务必在 prompt 中包含允许的最大下单额、滑点容忍度、有效时长（TTL）。
-
-示例模型输出 schema：
-```json
-{
-  "strategy_id": "arb_cross_01",
-  "intent": "place_orders",
-  "orders": [
-    {"exchange":"EXA","side":"buy","symbol":"AAA/USDT","price":0.1234,"amount":100},
-    {"exchange":"EXB","side":"sell","symbol":"AAA/USDT","price":0.1300,"amount":100}
-  ],
-  "metadata": {"expected_profit":2.1, "slippage_est":0.5}
-}
+project/
+├── README.md
+├── requirements.txt
+├── setup.py
+├── config/
+│   ├── __init__.py
+│   ├── settings.py
+│   └── environments/
+├── src/
+│   ├── __init__.py
+│   ├── data/
+│   │   ├── __init__.py
+│   │   ├── loaders.py
+│   │   └── preprocessors.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── strategies.py
+│   │   └── risk_models.py
+│   ├── execution/
+│   │   ├── __init__.py
+│   │   ├── broker_interfaces.py
+│   │   └── order_manager.py
+│   ├── risk/
+│   │   ├── __init__.py
+│   │   ├── limits.py
+│   │   └── monitoring.py
+│   ├── backtesting/
+│   │   ├── __init__.py
+│   │   └── engine.py
+│   └── utils/
+│       ├── __init__.py
+│       ├── decorators.py
+│       ├── metrics.py
+│       └── helpers.py
+├── tests/
+│   ├── __init__.py
+│   ├── unit/
+│   ├── integration/
+│   └── backtesting/
+├── notebooks/  # For research and analysis
+└── logs/
 ```
 
-## 5. 风控与下单验证（必须实现）
-1. **幂等性检测**：基于 client_order_id 或本地生成的 request id 确保重复请求不会重复成交。
-2. **最大下单原则**：不超过账户总资金的 X%（默认 1%）或单笔最大值阈（配置项）。
-3. **滑点/成交概率估计**：在低流动性代币尤其必要，使用市场深度模拟（模拟吃单到目标成交量）来估计成交价格与概率。
-4. **速率与失败策略**：若下单未在 T 秒内确认，则尝试取消并回滚。失败或部分成交时触发补单/对冲策略。
-5. **交易暂停条件**：价格波动 > Y%/分钟、订单簿深度异常、连接断开超过阈值，均触发暂停并报警。
+### 1.2 Module Organization
+- Use clear, descriptive names for modules and packages
+- Maintain consistent naming conventions throughout the project
+- Group related functionality in cohesive modules
+- Separate configuration, data, models, execution, and backtesting logic
 
-## 6. 回测与仿真规范
-- **数据质量**：回测需使用逐笔/逐档数据，模拟交易时要考虑手续费、滑点、撮合规则与结算时间。
-- **仿真模式**：支持“无风险仿真”（all dry-run）和“半真模拟”（真实下单但设置只模拟成交）两种模式。
-- **指标**：回撤（max drawdown）、Sharpe、Sortino、胜率、平均收益/交易、滑点消耗、手续费消耗。
-- **回放一致性**：回测结果需可复现：记录随机种子、版本号、回测时间段与数据快照哈希。
+## 2. Python Language Standards
 
-## 7. 监控与告警
-- **实时指标**：账户权益、未实现盈亏、持仓量、逐分/逐秒成交量、订单簿深度、连接健康度。
-- **告警阈值**：权益下降超过 X%、单笔滑点超过 Y%、API 错误率 > Z。
-- **告警通路**：邮件、Webhook、Slack/企业微信、Telegram。关键告警必须有人接收并手动确认。
+### 2.1 Type Hints and Static Analysis
+```python
+from typing import Optional, Dict, List, Union, Callable, TypeVar
+from datetime import datetime
+import numpy as np
+import pandas as pd
 
-## 8. 日志与审计
-- 每一笔由 agent 决策到最终成交的完整链路必须有可追溯日志：`[timestamp][request_id][agent_prompt][model_output][risk_decision][exchange_response]`。
-- 日志保留期：生产日志至少保留 1 年（或根据合规要求），敏感信息（API key）不得明文入日志。
-
-## 9. 测试矩阵（必做）
-- 单元测试：Market adapter、order serializer、risk checks。
-- 集成测试：mock 交易所（返回延迟、部分成交、拒单等场景）。
-- 回测验真：在历史逐笔数据上跑 N 次不同参数组合，并检查回放一致性。
-- 演练：定期演练 kill-switch、灾难恢复、以及大市场行情下的行为。
-
-## 10. 部署与运维
-- 容器化（Docker）部署，使用 k8s or Fargate 做弹性伸缩。
-- Secrets 管理：使用 Vault 或云厂商 Secrets Manager，不在代码/日志中硬编码密钥。
-- 熔断与隔离：每个策略/agent 运行在独立进程或容器，单个策略异常不影响整体系统。
-
-## 11. 代码风格与工程规范
-- 使用 type hints，遵循 PEP8，强制 static typing 检查（mypy），并通过 pre-commit hooks（black, isort, flake8）。
-- 每个策略必须包含 `README.md`（策略说明、参数含义、风险点、回测报告链接）。
-- 配置项以 YAML/JSON 存储，禁止在代码中写死敏感阈值。
-
-## 12. 模板：最小可用 agent 交互流程（伪代码）
-```py
-# 1. fetch market snapshot
-snapshot = market_fetcher.get_snapshot([("EXA","AAA/USDT"), ("EXB","AAA/USDT")])
-# 2. build prompt & call LLM for candidate orders
-prompt = build_prompt(snapshot, constraints)
-model_out = qwen_client.run(prompt)
-# 3. parse into structured orders
-orders = parse_model_output(model_out)
-# 4. risk checks
-orders = risk_engine.validate(orders, account_state)
-# 5. execute
-execution_report = executor.place_batch(orders)
-# 6. log
-audit_logger.record(request_id, prompt, model_out, orders, execution_report)
+def calculate_sharpe_ratio(
+    returns: pd.Series, 
+    risk_free_rate: float = 0.0
+) -> float:
+    """
+    Calculate the Sharpe ratio for a series of returns.
+    
+    Args:
+        returns: Series of returns
+        risk_free_rate: Risk-free rate to subtract from returns (default 0.0)
+        
+    Returns:
+        Sharpe ratio
+    """
+    excess_returns = returns - risk_free_rate
+    return excess_returns.mean() / excess_returns.std() * np.sqrt(252)  # Annualized
 ```
 
-## 13. 配置示例（YAML）
+- Use type hints for all functions, methods, and class attributes
+- Run mypy for static type checking with strict settings
+- Use TypedDict for complex dictionary structures
+- Utilize Protocol for structural subtyping where appropriate
+
+### 2.2 Code Formatting
+- Follow PEP 8 guidelines with 4-space indentation
+- Use Black for automatic code formatting
+- Set line length to 88 characters (Black default)
+- Use isort for import organization
+- Maintain consistent naming conventions
+
+### 2.3 Import Organization
+```python
+# Standard library imports
+from datetime import datetime
+from typing import Dict, List
+import os
+import sys
+
+# Third-party imports
+import numpy as np
+import pandas as pd
+from scipy import stats
+import matplotlib.pyplot as plt
+
+# Local application/library imports
+from src.models.strategies import BaseStrategy
+from src.utils.metrics import calculate_sharpe_ratio
+```
+
+## 3. Data Handling & Performance
+
+### 3.1 Data Structures
+- Use pandas for data manipulation and analysis
+- Leverage NumPy for numerical computations
+- Consider Dask for large datasets that don't fit in memory
+- Use proper data types (e.g., category for strings, int64/float64 for numbers)
+- Implement proper date/time handling with timezone awareness
+
+### 3.2 Performance Optimization
+```python
+# Use vectorized operations when possible
+def vectorized_calculation(prices: pd.Series) -> pd.Series:
+    # Good - vectorized
+    returns = prices.pct_change()
+    return returns
+    
+def non_vectorized_calculation(prices: pd.Series) -> pd.Series:
+    # Avoid - loops are slow
+    returns = []
+    for i in range(1, len(prices)):
+        returns.append((prices[i] - prices[i-1]) / prices[i-1])
+    return pd.Series(returns, index=prices.index[1:])
+```
+
+- Prioritize vectorized operations over loops
+- Use numba for computational bottlenecks
+- Profile code using cProfile or line_profiler
+- Use memory-efficient data structures and operations
+
+### 3.3 Memory Management
+- Explicitly delete large objects when no longer needed
+- Use generators for processing large datasets
+- Implement proper garbage collection strategies
+
+## 4. Error Handling and Robustness
+
+### 4.1 Exception Handling
+```python
+import logging
+from typing import Optional
+
+def fetch_market_data(symbol: str) -> Optional[pd.DataFrame]:
+    """
+    Fetch market data for a given symbol.
+    
+    Args:
+        symbol: Trading symbol to fetch data for
+        
+    Returns:
+        DataFrame with market data or None if error
+    """
+    try:
+        # Data fetching logic here
+        data = api_client.get_data(symbol)
+        return data
+    except APIException as e:
+        logging.error(f"API error while fetching data for {symbol}: {str(e)}")
+        return None
+    except ValueError as e:
+        logging.error(f"Data validation error for {symbol}: {str(e)}")
+        return None
+    except Exception as e:
+        logging.error(f"Unexpected error while fetching data for {symbol}: {str(e)}")
+        return None
+```
+
+- Implement specific exception handling for different error types
+- Log errors with appropriate severity levels
+- Implement retry mechanisms for transient failures
+- Design for graceful degradation
+
+### 4.2 Input Validation
+```python
+def validate_order(order_params: Dict) -> bool:
+    """
+    Validate order parameters before execution.
+    
+    Args:
+        order_params: Dictionary containing order parameters
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    required_fields = ['symbol', 'side', 'quantity', 'price']
+    for field in required_fields:
+        if field not in order_params:
+            raise ValueError(f"Missing required field: {field}")
+    
+    if order_params['quantity'] <= 0:
+        raise ValueError("Quantity must be positive")
+        
+    if order_params['price'] <= 0:
+        raise ValueError("Price must be positive")
+        
+    return True
+```
+
+## 5. Testing and Verification
+
+### 5.1 Testing Strategy
+- 100% test coverage for critical trading logic
+- Unit tests for all functions and methods
+- Integration tests for end-to-end trading workflows
+- Backtesting validation against historical data
+- Stress testing with various market conditions
+
+### 5.2 Test Examples
+```python
+import pytest
+import pandas as pd
+from src.models.strategies import MeanReversionStrategy
+
+def test_calculate_position_size():
+    """Test position sizing logic"""
+    strategy = MeanReversionStrategy()
+    result = strategy.calculate_position_size(
+        price=100.0,
+        account_balance=10000.0,
+        risk_percentage=0.02
+    )
+    expected = 200.0  # 2% of $10,000 at $100 price = 2 shares
+    assert result == expected
+
+def test_strategy_signal_generation():
+    """Test that strategy generates valid signals"""
+    strategy = MeanReversionStrategy()
+    data = pd.DataFrame({
+        'close': [100, 102, 101, 98, 97, 99, 101],
+        'sma': [101, 101, 101, 100, 100, 100, 100]
+    })
+    signals = strategy.generate_signals(data)
+    
+    # Verify signal structure and valid values
+    assert 'signal' in signals.columns
+    assert all(signal in [-1, 0, 1] for signal in signals['signal'])
+```
+
+## 6. Logging and Monitoring
+
+### 6.1 Logging Standards
+- Use structured logging with JSON format for production
+- Include request IDs, session IDs, and other correlation IDs
+- Log at appropriate levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- Include performance metrics in logs when appropriate
+
+### 6.2 Log Examples
+```python
+import logging
+import json
+from datetime import datetime
+
+def log_trade_execution(order_id: str, symbol: str, quantity: float, price: float):
+    """Log trade execution details"""
+    log_data = {
+        'event': 'trade_execution',
+        'order_id': order_id,
+        'symbol': symbol,
+        'quantity': quantity,
+        'price': price,
+        'timestamp': datetime.utcnow().isoformat(),
+        'execution_type': 'market'
+    }
+    logging.info(json.dumps(log_data))
+```
+
+## 7. Risk Management
+
+### 7.1 Risk Controls
+- Implement position limits and stop-losses
+- Validate all positions against risk parameters
+- Monitor portfolio exposure and concentration
+- Implement circuit breakers for extreme market conditions
+
+### 7.2 Risk Metrics
+- Calculate Value at Risk (VaR) and Expected Shortfall
+- Monitor portfolio Greeks for options positions
+- Track drawdown and maximum adverse excursion
+- Implement real-time risk monitoring
+
+## 8. AI Agent Development Standards
+
+### 8.1 Agent Architecture
+- Define clear observation, action, and reward spaces
+- Maintain separation between environment and agent logic
+- Implement proper state management and reset functionality
+- Use well-defined interfaces between components
+
+### 8.2 Model Training and Validation
+- Implement proper train/validation/test splits
+- Use walk-forward analysis for time series data
+- Validate models on out-of-sample data
+- Monitor for overfitting and data leakage
+
+### 8.3 Agent Example
+```python
+import numpy as np
+import pandas as pd
+from typing import Tuple
+
+class TradingAgent:
+    """Base class for trading agents"""
+    
+    def __init__(self, state_size: int, action_size: int):
+        self.state_size = state_size
+        self.action_size = action_size
+        self.model = self._build_model()
+        
+    def _build_model(self):
+        """Build the agent's model"""
+        # Model building logic here
+        pass
+        
+    def act(self, state: np.ndarray) -> Tuple[int, float]:
+        """
+        Take action based on current state.
+        
+        Args:
+            state: Current market state
+            
+        Returns:
+            (action, confidence) tuple
+        """
+        # Agent action logic
+        pass
+        
+    def train(self, experiences: List[Tuple]) -> float:
+        """
+        Train the agent on experiences.
+        
+        Args:
+            experiences: List of (state, action, reward, next_state, done) tuples
+            
+        Returns:
+            Training loss
+        """
+        # Training logic
+        pass
+```
+
+## 9. Configuration Management
+
+### 9.1 Environment Configuration
+- Use environment variables for sensitive information
+- Store configuration in YAML/JSON files
+- Implement different configurations for development, staging, and production
+- Validate configuration values at startup
+
+### 9.2 Configuration Example
 ```yaml
-agent:
-  name: cross-exchange-arb
-  max_notional_pct: 0.01  # 单次下单不超过总资产 1%
-  max_order_value: 1000   # 单笔不超过 1000 USDT
-  slippage_tolerance_pct: 0.5
-  kill_switch_on_drawdown_pct: 5.0
-exchanges:
-  - name: EXA
-    api_endpoint: https://api.exa.com
-  - name: EXB
-    api_endpoint: https://api.exb.com
+# config/production.yaml
+trading:
+  max_position_size: 10000
+  max_drawdown: 0.05
+  slippage_tolerance: 0.001
+  api_rate_limit: 5  # requests per second
+
+risk:
+  max_daily_loss: 0.02
+  max_position_concentration: 0.10
+  circuit_breaker_threshold: 0.03
+
+logging:
+  level: INFO
+  format: json
+  output: file
 ```
 
-## 14. 常见风险警示（务必阅读）
-- **低流动性代币套利风险大**：极端滑点、交易对断裂、定价错误或交易所延迟都可能导致快速爆仓或锁仓。
-- **合规风险**：部分交易所/代币可能存在合规问题（受制裁、被列黑名单）。上线前必须做合规筛查。
-- **市场操纵**：不得实施或配合任何形式的操纵市场行为。
+## 10. Deployment and Infrastructure
+
+### 10.1 Containerization
+- Use Docker for consistent deployment environments
+- Implement multi-stage builds to minimize image size
+- Implement health checks for services
+- Use environment-specific Docker Compose files
+
+### 10.2 CI/CD Pipeline
+- Implement automated testing for all code changes
+- Run static analysis tools (mypy, flake8, black)
+- Implement automated deployment to staging
+- Use feature flags for safe rollouts
+
+### 10.3 Infrastructure as Code
+- Use Terraform or CloudFormation for infrastructure provisioning
+- Implement proper secret management
+- Implement proper backup and disaster recovery procedures
+
+## 11. Security Standards
+
+### 11.1 Secret Management
+- Never hardcode API keys or sensitive information
+- Use environment variables or secret management systems
+- Implement proper key rotation procedures
+- Follow principle of least privilege for all services
+
+### 11.2 Secure Coding Practices
+- Validate all inputs to prevent injection attacks
+- Implement proper authentication and authorization
+- Use secure communication protocols (HTTPS, TLS)
+- Sanitize and validate all data from external sources
+
+## 12. Documentation Standards
+
+### 12.1 Code Documentation
+- Document all public functions, classes, and modules with docstrings
+- Use Google or NumPy docstring format consistently
+- Include examples in documentation where helpful
+- Maintain a comprehensive README with setup instructions
+
+### 12.2 Architecture Documentation
+- Document system architecture with diagrams
+- Explain data flow and component interactions
+- Document deployment procedures
+- Maintain API documentation
+
+## 13. Best Practices from Top Trading Firms
+
+### 13.1 Goldman Sachs Approach
+- Emphasis on code review and pair programming
+- Extensive automated testing and validation
+- Focus on code quality metrics and technical debt management
+
+### 13.2 Renaissance Technologies Approach
+- Heavy emphasis on data quality and validation
+- Rigorous backtesting with proper statistical significance
+- Focus on algorithmic efficiency and optimization
+
+### 13.3 Two Sigma Approach
+- Integration of machine learning best practices
+- Strong emphasis on reproducibility and version control
+- Collaborative development tools and workflows
+
+### 13.4 Citadel Approach
+- Risk-first development methodology
+- Real-time monitoring and alerting systems
+- Performance optimization and low-latency requirements
 
 ---
 
-## 附录：快速检查表（上线前）
-- [ ] API keys 权限检查（无提币或提币受限并有审批）
-- [ ] 回测结果与仿真结果一致性校验
-- [ ] 风控阈值与 kill-switch 已配置并可远程触发
-- [ ] 审计日志与监控告警已接入运维值班系统
-- [ ] 人工审批流程对大额/高风险操作生效
-
----
-
-> 版本：1.0 — 说明：本规范为工程与风控指导模板，请根据贵司合规与法律团队进一步定制。
-
+> Version: 1.0 — This document represents best practices from top quantitative trading firms and should be customized based on your specific requirements and compliance needs.
