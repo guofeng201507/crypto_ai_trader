@@ -1,6 +1,6 @@
 """
 Test script for Trade Chatbot APIs
-This script allows testing of both Alpha Vantage and Qwen APIs independently.
+This script allows testing of both Yahoo Finance and Qwen APIs independently.
 """
 import os
 import sys
@@ -21,43 +21,45 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def test_alpha_vantage_api():
-    """Test the Alpha Vantage API directly"""
-    print("\n=== Testing Alpha Vantage API ===")
-    
-    api_key = os.environ.get('ALPHA_VANTAGE_API_KEY', '20KCRQCE82CTCDVI')
-    if not api_key or api_key == '20KCRQCE82CTCDVI':
-        print("WARNING: Using default API key. Consider setting your own ALPHA_VANTAGE_API_KEY in .env")
+def test_yahoo_finance_api():
+    """Test the Yahoo Finance API directly"""
+    print("\n=== Testing Yahoo Finance API ===")
     
     # Test with a valid symbol
-    symbols_to_test = ['AAPL'] # 'GOOGL', 'MSFT', 'TSLA'
+    symbols_to_test = ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'BTC-USD', 'ETH-USD']
     
     for symbol in symbols_to_test:
         print(f"\nTesting symbol: {symbol}")
         
-        # Using the MCP server
-        mcp_url = 'https://mcp.alphavantage.co/mcp'
-        params = {
-            'apikey': api_key,
-            'function': 'GLOBAL_QUOTE',
-            'symbol': symbol
-        }
-        
         try:
-            response = requests.get(mcp_url, params=params, timeout=30)
-            logger.info(f"Alpha Vantage API response status for {symbol}: {response.status_code}")
+            # Using the Yahoo Finance base URL
+            yahoo_url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + symbol
+            
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
+            
+            params = {
+                "range": "1d",
+                "interval": "1m"
+            }
+            
+            response = requests.get(yahoo_url, params=params, headers=headers, timeout=30)
+            logger.info(f"Yahoo Finance API response status for {symbol}: {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
-                logger.info(f"Alpha Vantage API response for {symbol}: {data}")
+                logger.info(f"Yahoo Finance API response keys for {symbol}: {list(data.keys())}")
                 
-                if "Global Quote" in data:
-                    quote = data["Global Quote"]
+                if "chart" in data and "result" in data["chart"] and len(data["chart"]["result"]) > 0:
+                    result = data["chart"]["result"][0]
+                    meta = result.get("meta", {})
                     print(f"  ✓ Successfully retrieved data for {symbol}")
-                    print(f"    Price: {quote.get('05. price', 'N/A')}")
-                    print(f"    Change: {quote.get('09. change', 'N/A')} ({quote.get('10. change percent', 'N/A')})")
+                    print(f"    Symbol: {meta.get('symbol', 'N/A')}")
+                    print(f"    Price: ${meta.get('regularMarketPrice', 'N/A')}")
+                    print(f"    Previous Close: ${meta.get('previousClose', 'N/A')}")
                 else:
-                    print(f"  ✗ No 'Global Quote' in response for {symbol}")
+                    print(f"  ✗ No chart data in response for {symbol}")
                     print(f"    Response keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
             else:
                 print(f"  ✗ Error fetching data for {symbol}: {response.status_code}")
@@ -128,14 +130,14 @@ def test_integration():
         from trade_chatbot.backend.api.chat import generate_response_with_qwen
         
         # Test stock data retrieval
-        symbols = ['AAPL', 'GOOGL']
+        symbols = ['AAPL', 'GOOGL', 'BTC-USD', 'ETH-USD']
         for symbol in symbols:
-            print(f"\nTesting stock data for {symbol}:")
+            print(f"\nTesting data for {symbol}:")
             stock_data = get_stock_data(symbol)
             if stock_data:
-                print(f"  ✓ Got stock data: {stock_data}")
+                print(f"  ✓ Got data: {stock_data}")
             else:
-                print(f"  ✗ Failed to get stock data for {symbol}")
+                print(f"  ✗ Failed to get data for {symbol}")
         
         # Test AI response generation (without stock data)
         print(f"\nTesting Qwen response generation:")
@@ -152,10 +154,10 @@ def test_integration():
 
 if __name__ == "__main__":
     print("Trade Chatbot API Testing Tool")
-    print("This script will test both the Alpha Vantage and Qwen APIs")
+    print("This script will test both the Yahoo Finance and Qwen APIs")
     
     # Run all tests
-    test_alpha_vantage_api()
+    test_yahoo_finance_api()
     test_qwen_api()
     test_integration()
     

@@ -18,144 +18,148 @@ logger = logging.getLogger(__name__)
 # Load environment variables from .env file
 load_dotenv()
 
+# Alpha Vantage configuration (keeping for backward compatibility)
 ALPHA_VANTAGE_API_KEY = os.environ.get('ALPHA_VANTAGE_API_KEY', '20KCRQCE82CTCDVI')
 ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query'
 
-def get_crypto_data(symbol: str, market: str = "USD") -> Optional[Dict]:
-    """
-    Get cryptocurrency data for a given symbol using Alpha Vantage API
-    """
-    logger.info(f"Fetching cryptocurrency data for symbol: {symbol}, market: {market}")
-    
-    try:
-        # Using the digital currency listing function for Alpha Vantage
-        params = {
-            "function": "CURRENCY_EXCHANGE_RATE",
-            "from_currency": symbol,
-            "to_currency": market,
-            "apikey": ALPHA_VANTAGE_API_KEY
-        }
-        
-        logger.info(f"Making crypto API request to: {ALPHA_VANTAGE_BASE_URL} with params: {params}")
-        
-        response = requests.get(ALPHA_VANTAGE_BASE_URL, params=params)
-        
-        logger.info(f"Crypto API response status code: {response.status_code}")
-        logger.info(f"Crypto API response text: {response.text}")
-        
-        if response.status_code == 200:
-            try:
-                data = response.json()
-                logger.info(f"Crypto API response data: {data}")
-                
-                # Check if the response contains the expected data
-                if "Realtime Currency Exchange Rate" in data:
-                    rate_info = data["Realtime Currency Exchange Rate"]
-                    result = {
-                        "symbol": rate_info.get("1. From_Currency Code"),
-                        "market": rate_info.get("3. To_Currency Code"),
-                        "price": float(rate_info.get("5. Exchange Rate", 0)),
-                        "open": float(rate_info.get("8. Bid Price", 0)),
-                        "high": float(rate_info.get("9. Ask Price", 0)),
-                        "last_refreshed": rate_info.get("6. Last Refreshed"),
-                        "timezone": rate_info.get("7. Time Zone"),
-                        "summary": f"1 {rate_info.get('1. From_Currency Code', 'N/A')} = {rate_info.get('5. Exchange Rate', 'N/A')} {rate_info.get('3. To_Currency Code', 'N/A')}, "
-                                   f"Bid: {rate_info.get('8. Bid Price', 'N/A')}, Ask: {rate_info.get('9. Ask Price', 'N/A')}"
-                    }
-                    
-                    logger.info(f"Successfully parsed crypto data for {symbol}: {result}")
-                    return result
-                else:
-                    # If the specific function isn't available, return None
-                    logger.warning(f"Crypto data not available for symbol {symbol}: {data}")
-                    return None
-            except ValueError:
-                # Handle case where response is not JSON
-                logger.error(f"Crypto response is not valid JSON for symbol {symbol}: {response.text}")
-                return None
-        else:
-            logger.error(f"Error fetching crypto data for {symbol}: {response.status_code} - {response.text}")
-            return None
-    except Exception as e:
-        logger.error(f"Exception occurred while fetching crypto data for {symbol}: {str(e)}")
-        return None
+# Yahoo Finance configuration
+YAHOO_FINANCE_BASE_URL = 'https://query1.finance.yahoo.com/v8/finance/chart/'
 
-def get_stock_data(symbol: str) -> Optional[Dict]:
+def get_yahoo_finance_data(symbol: str) -> Optional[Dict]:
     """
-    Get data for a given symbol (stock or crypto) using Alpha Vantage API
+    Get stock or cryptocurrency data for a given symbol using Yahoo Finance API
     """
-    logger.info(f"Fetching data for symbol: {symbol}")
-    
-    # Common cryptocurrency symbols that Alpha Vantage supports
-    crypto_symbols = {"BTC", "ETH", "LTC", "BCH", "BNB", "EOS", "XRP", "XLM", "ADA", "TRX", "USDT", "DOT", "UNI"}
-    
-    # Check if the symbol is likely a cryptocurrency
-    if symbol.upper() in crypto_symbols:
-        logger.info(f"Detected cryptocurrency symbol: {symbol}, using crypto API")
-        return get_crypto_data(symbol)
+    logger.info(f"Fetching data for symbol: {symbol} from Yahoo Finance")
     
     try:
-        # Using the regular Alpha Vantage API for stocks
-        params = {
-            "function": "GLOBAL_QUOTE",
-            "symbol": symbol,
-            "apikey": ALPHA_VANTAGE_API_KEY
+        # Using Yahoo Finance API
+        url = f"{YAHOO_FINANCE_BASE_URL}{symbol}"
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
         
-        logger.info(f"Making API request to: {ALPHA_VANTAGE_BASE_URL} with params: {params}")
+        params = {
+            "range": "1d",
+            "interval": "1m"
+        }
         
-        response = requests.get(ALPHA_VANTAGE_BASE_URL, params=params)
+        logger.info(f"Making Yahoo Finance API request to: {url} with params: {params}")
         
-        logger.info(f"API response status code: {response.status_code}")
-        logger.info(f"API response text: {response.text}")
+        response = requests.get(url, params=params, headers=headers)
+        
+        logger.info(f"Yahoo Finance API response status code: {response.status_code}")
+        logger.info(f"Yahoo Finance API response text: {response.text[:200]}...")  # Log first 200 chars
         
         if response.status_code == 200:
             try:
                 data = response.json()
-                logger.info(f"API response data: {data}")
+                logger.info(f"Yahoo Finance API response data keys: {list(data.keys())}")
                 
                 # Check if the response contains the expected data
-                if "Global Quote" in data:
-                    quote = data["Global Quote"]
-                    result = {
-                        "symbol": quote.get("01. symbol"),
-                        "price": float(quote.get("05. price", 0)),
-                        "open": float(quote.get("02. open", 0)),
-                        "high": float(quote.get("03. high", 0)),
-                        "low": float(quote.get("04. low", 0)),
-                        "volume": int(quote.get("06. volume", 0)),
-                        "latest_trading_day": quote.get("07. latest trading day"),
-                        "previous_close": float(quote.get("08. previous close", 0)),
-                        "change": float(quote.get("09. change", 0)),
-                        "change_percent": quote.get("10. change percent"),
-                        "summary": f"Price: ${quote.get('05. price', 'N/A')}, "
-                                   f"Change: {quote.get('09. change', 'N/A')} "
-                                   f"({quote.get('10. change percent', 'N/A')})"
-                    }
+                if "chart" in data and "result" in data["chart"] and len(data["chart"]["result"]) > 0:
+                    result = data["chart"]["result"][0]
                     
-                    logger.info(f"Successfully parsed stock data for {symbol}: {result}")
-                    return result
+                    # Extract metadata
+                    meta = result.get("meta", {})
+                    
+                    # Extract the latest quote data
+                    if "indicators" in result and "quote" in result["indicators"] and len(result["indicators"]["quote"]) > 0:
+                        quote = result["indicators"]["quote"][0]
+                        
+                        # Get the latest non-null values
+                        latest_index = -1
+                        latest_price = None
+                        latest_volume = None
+                        
+                        # Find the latest valid data point
+                        for i in range(len(quote.get("close", [])) - 1, -1, -1):
+                            if quote.get("close", [])[i] is not None:
+                                latest_index = i
+                                latest_price = float(quote.get("close", [])[i])
+                                latest_volume = int(quote.get("volume", [])[i] or 0)
+                                break
+                        
+                        if latest_price is not None:
+                            result_data = {
+                                "symbol": meta.get("symbol"),
+                                "price": latest_price,
+                                "open": float(meta.get("previousClose", 0)),
+                                "high": float(max([x for x in quote.get("high", []) if x is not None]) if quote.get("high") else 0),
+                                "low": float(min([x for x in quote.get("low", []) if x is not None]) if quote.get("low") else 0),
+                                "volume": latest_volume,
+                                "latest_trading_day": datetime.fromtimestamp(meta.get("regularMarketTime", 0)).strftime('%Y-%m-%d'),
+                                "previous_close": float(meta.get("previousClose", 0)),
+                                "change": latest_price - float(meta.get("previousClose", 0)),
+                                "change_percent": ((latest_price - float(meta.get("previousClose", 0))) / float(meta.get("previousClose", 1)) * 100) if meta.get("previousClose") else 0,
+                                "summary": f"Price: ${latest_price:.2f}, "
+                                           f"Change: ${latest_price - float(meta.get('previousClose', 0)):.2f} "
+                                           f"({((latest_price - float(meta.get('previousClose', 0))) / float(meta.get('previousClose', 1)) * 100):.2f}%)"
+                            }
+                            
+                            logger.info(f"Successfully parsed Yahoo Finance data for {symbol}: {result_data}")
+                            return result_data
+                        else:
+                            logger.warning(f"No valid price data found for symbol {symbol}")
+                            return None
+                    else:
+                        logger.warning(f"No quote data available for symbol {symbol}: {result}")
+                        return None
                 else:
                     # If the specific function isn't available, return None
                     logger.warning(f"Data not available for symbol {symbol}: {data}")
                     return None
-            except ValueError:
+            except ValueError as ve:
                 # Handle case where response is not JSON
-                logger.error(f"Response is not valid JSON for symbol {symbol}: {response.text}")
+                logger.error(f"Yahoo Finance response is not valid JSON for symbol {symbol}: {response.text}")
+                logger.error(f"ValueError: {str(ve)}")
+                return None
+            except Exception as je:
+                # Handle JSON parsing errors
+                logger.error(f"Error parsing Yahoo Finance JSON for symbol {symbol}: {str(je)}")
                 return None
         else:
-            logger.error(f"Error fetching data for {symbol}: {response.status_code} - {response.text}")
-            # Try the crypto API if stock API fails
-            crypto_result = get_crypto_data(symbol)
-            if crypto_result:
-                return crypto_result
+            logger.error(f"Error fetching data from Yahoo Finance for {symbol}: {response.status_code} - {response.text}")
             return None
     except Exception as e:
+        logger.error(f"Exception occurred while fetching data from Yahoo Finance for {symbol}: {str(e)}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        return None
+
+def get_crypto_data(symbol: str, market: str = "USD") -> Optional[Dict]:
+    """
+    Get cryptocurrency data for a given symbol using Yahoo Finance API
+    Convert common crypto symbols to Yahoo Finance format (e.g., BTC -> BTC-USD)
+    """
+    logger.info(f"Fetching cryptocurrency data for symbol: {symbol}, market: {market}")
+    
+    # Convert symbol to Yahoo Finance format
+    yahoo_symbol = f"{symbol}-{market}" if "-" not in symbol else symbol
+    
+    return get_yahoo_finance_data(yahoo_symbol)
+
+def get_stock_data(symbol: str) -> Optional[Dict]:
+    """
+    Get data for a given symbol (stock or crypto) using Yahoo Finance API
+    """
+    logger.info(f"Fetching data for symbol: {symbol}")
+    
+    # Common cryptocurrency symbols that Yahoo Finance supports
+    crypto_symbols = {"BTC", "ETH", "LTC", "BCH", "BNB", "EOS", "XRP", "XLM", "ADA", "TRX", "USDT", "DOT", "UNI"}
+    
+    # Check if the symbol is likely a cryptocurrency
+    symbol_upper = symbol.upper()
+    if symbol_upper in crypto_symbols:
+        logger.info(f"Detected cryptocurrency symbol: {symbol}, using crypto API")
+        return get_crypto_data(symbol_upper)
+    
+    # For stocks, use Yahoo Finance directly
+    try:
+        logger.info(f"Using Yahoo Finance API for stock symbol: {symbol}")
+        return get_yahoo_finance_data(symbol_upper)
+    except Exception as e:
         logger.error(f"Exception occurred while fetching data for {symbol}: {str(e)}")
-        # Try the crypto API if stock API fails with exception
-        crypto_result = get_crypto_data(symbol)
-        if crypto_result:
-            return crypto_result
         return None
 
 def get_historical_data(symbol: str, outputsize: str = "compact", datatype: str = "json") -> Optional[Dict]:
