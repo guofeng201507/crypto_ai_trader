@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactMarkdown from 'react-markdown';
 import './Message.css';
 
 const Message = ({ message }) => {
@@ -13,12 +14,18 @@ const Message = ({ message }) => {
   return (
     <div className={`message ${isUser ? 'user-message' : 'bot-message'}`}>
       <div className="message-content">
-        {message.text.split('\n').map((line, i) => (
-          <React.Fragment key={i}>
-            {line}
-            {i < message.text.split('\n').length - 1 && <br />}
-          </React.Fragment>
-        ))}
+        {isUser ? (
+          // For user messages, render as plain text with line breaks
+          message.text.split('\n').map((line, i) => (
+            <React.Fragment key={i}>
+              {line}
+              {i < message.text.split('\n').length - 1 && <br />}
+            </React.Fragment>
+          ))
+        ) : (
+          // For bot messages, render as markdown
+          <ReactMarkdown>{message.text}</ReactMarkdown>
+        )}
       </div>
       <div className="message-timestamp">
         {formatTime(message.timestamp)}
