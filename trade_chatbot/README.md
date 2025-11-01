@@ -7,12 +7,13 @@ A web-based chatbot for trading and financial data queries with context engineer
 - Web-based chat interface similar to ChatGPT with left-aligned markdown rendering
 - Context management to maintain conversation history
 - Integration with Yahoo Finance for real-time stock, cryptocurrency, and precious metals data
-- Alpha Vantage MCP server integration as a fallback data source
+- Alpha Vantage MCP server integration (currently implemented but not active due to method availability)
 - Qwen AI integration for advanced natural language understanding
 - Ability to interpret natural language queries and map them to appropriate financial symbols (e.g., "gold" to XAUUSD, "bitcoin" to BTC-USD)
 - Support for multiple asset types including stocks, cryptocurrencies, precious metals, and forex pairs
 - Responsive design for desktop and mobile
 - Automatic interpretation of financial asset requests (e.g., "What's the price of gold?" or "How much is Bitcoin?")
+- Robust fallback mechanisms for data retrieval
 
 ## Tech Stack
 
@@ -83,11 +84,13 @@ The frontend will start on `http://localhost:3000` and will proxy API requests t
 
 ### MCP (Model Context Protocol) Endpoints
 - **GET** `/api/mcp/quote?symbol={symbol}`
-  - Get quote for a given symbol from Alpha Vantage MCP server
+  - Get quote for a given symbol from Alpha Vantage MCP server (currently not active)
 - **GET** `/api/mcp/time_series_daily?symbol={symbol}`
-  - Get daily time series data for a given symbol from Alpha Vantage MCP server
+  - Get daily time series data for a given symbol from Alpha Vantage MCP server (currently not active)
 - **GET** `/api/mcp/sector`
-  - Get sector performance data from Alpha Vantage MCP server
+  - Get sector performance data from Alpha Vantage MCP server (currently not active)
+
+> **Note**: The MCP server endpoints are implemented but currently not active, as the Alpha Vantage MCP service doesn't support the expected methods. The system falls back to Yahoo Finance which provides reliable data for most assets.
 
 ## Context Engineering
 
