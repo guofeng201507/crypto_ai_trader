@@ -296,6 +296,18 @@ def get_mcp_data(symbol: str) -> Optional[Dict]:
         
         logger.info(f"MCP server response status: {response.status_code}")
         
+        # Check if the method is not found (which seems to be the current issue)
+        if response.status_code == 404:
+            try:
+                error_data = response.json()
+                if "error" in error_data and "Method not found" in error_data["error"]["message"]:
+                    logger.warning(f"MCP server does not support the method: {payload['method']}. Response: {error_data}")
+                    # For now, return None since the method is not available
+                    return None
+            except json.JSONDecodeError:
+                logger.error(f"Response from MCP server is not valid JSON: {response.text}")
+                return None
+        
         if response.status_code == 200:
             try:
                 data = response.json()
