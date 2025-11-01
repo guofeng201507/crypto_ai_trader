@@ -135,28 +135,47 @@ def get_crypto_data(symbol: str, market: str = "USD") -> Optional[Dict]:
     logger.info(f"Fetching cryptocurrency data for symbol: {symbol}, market: {market}")
     
     # Convert symbol to Yahoo Finance format
-    yahoo_symbol = f"{symbol}-{market}" if "-" not in symbol else symbol
+    if "-USD" in symbol or "-BTC" in symbol or "-ETH" in symbol or "-EUR" in symbol or "-GBP" in symbol:
+        # Already in the correct format (e.g., BTC-USD)
+        yahoo_symbol = symbol
+    else:
+        # Need to format it (e.g., BTC to BTC-USD)
+        yahoo_symbol = f"{symbol}-{market}"
     
     return get_yahoo_finance_data(yahoo_symbol)
 
 def get_stock_data(symbol: str) -> Optional[Dict]:
     """
-    Get data for a given symbol (stock or crypto) using Yahoo Finance API
+    Get data for a given symbol (stock, crypto, or precious metals) using Yahoo Finance API
     """
     logger.info(f"Fetching data for symbol: {symbol}")
     
     # Common cryptocurrency symbols that Yahoo Finance supports
     crypto_symbols = {"BTC", "ETH", "LTC", "BCH", "BNB", "EOS", "XRP", "XLM", "ADA", "TRX", "USDT", "DOT", "UNI"}
     
-    # Check if the symbol is likely a cryptocurrency
+    # Precious metals and forex symbols that Yahoo Finance supports
+    precious_metals = {"XAUUSD", "XAGUSD", "XPTUSD", "XPDUSD"}
+    
     symbol_upper = symbol.upper()
+    
+    # Handle precious metals symbols (e.g., XAUUSD, XAGUSD, etc.)
+    if symbol_upper in precious_metals:
+        logger.info(f"Detected precious metal symbol: {symbol}, using Yahoo Finance API directly")
+        return get_yahoo_finance_data(symbol_upper)
+    
+    # Check if it's a crypto symbol in the form BTC-USD, ETH-USD, etc.
+    if '-' in symbol_upper and symbol_upper.split('-')[0] in crypto_symbols:
+        logger.info(f"Detected cryptocurrency symbol in format: {symbol}, using crypto API")
+        return get_crypto_data(symbol_upper.split('-')[0], symbol_upper.split('-')[1])  # Extract base and quote currencies
+    
+    # Check if the symbol is likely a cryptocurrency in short format (e.g., BTC, ETH)
     if symbol_upper in crypto_symbols:
         logger.info(f"Detected cryptocurrency symbol: {symbol}, using crypto API")
         return get_crypto_data(symbol_upper)
     
-    # For stocks, use Yahoo Finance directly
+    # For stocks and other symbols, use Yahoo Finance directly
     try:
-        logger.info(f"Using Yahoo Finance API for stock symbol: {symbol}")
+        logger.info(f"Using Yahoo Finance API for symbol: {symbol}")
         return get_yahoo_finance_data(symbol_upper)
     except Exception as e:
         logger.error(f"Exception occurred while fetching data for {symbol}: {str(e)}")

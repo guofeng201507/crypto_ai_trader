@@ -4,6 +4,7 @@ Chat API endpoints for the trade chatbot
 from flask import Blueprint, request, jsonify
 from ..context_engine.context_manager import ContextManager
 from ..utils.helpers import get_stock_data
+from ..config.prompts import FINANCIAL_KEYWORDS, INTERPRETATION_PROMPT_TEMPLATE, ASSET_INFO_PROMPT_TEMPLATE, STOCK_INFO_PROMPT_TEMPLATE, FALLBACK_PROMPT_TEMPLATE, NO_SYMBOL_PROMPT_TEMPLATE, GENERAL_CHAT_PROMPT_TEMPLATE
 import os
 import requests
 from dotenv import load_dotenv
@@ -97,34 +98,66 @@ def generate_response_with_qwen(user_message, context):
     Generate a response using the Qwen API with the provided user message and context.
     """
     try:
-        # Check if the message is about stock or crypto data
+        # Check if the message is about financial assets using configurable keywords
         user_message_lower = user_message.lower()
-        if any(word in user_message_lower for word in ['stock', 'price', 'symbol', 'ticker', 'bitcoin', 'ethereum', 'crypto', 'btc', 'eth']):
-            # Extract potential symbol from message
-            import re
-            symbols = re.findall(r'\b([A-Z]{3,5}|BTC|ETH|LTC|BCH|BNB|EOS|XRP|XLM|ADA|TRX|USDT|DOT|UNI)\b', user_message)
-            
-            if symbols:
-                symbol = symbols[0].upper()  # Take the first symbol found and convert to uppercase
-                data = get_stock_data(symbol)  # This now handles both stocks and crypto
+        is_financial_query = any(keyword in user_message_lower for keyword in FINANCIAL_KEYWORDS)
+        
+        if is_financial_query:
+            # First, ask the LLM to interpret the user's request and provide the appropriate symbol
+            interpretation_prompt = INTERPRETATION_PROMPT_TEMPLATE.format(user_message=user_message)
+
+            # Prepare headers and payload for the interpretation API request
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {qwen_api_key}"
+            }
+
+            interpretation_payload = {
+                "model": "qwen-max",
+                "messages": [
+                    {"role": "system", "content": "You are a financial symbol interpreter. You only return the appropriate financial symbol for the given query. No explanations, no additional text."},
+                    {"role": "user", "content": interpretation_prompt}
+                ],
+                "max_tokens": 100,
+                "temperature": 0.3
+            }
+
+            # Make a request to the Qwen API to interpret the symbol
+            interpretation_response = requests.post(
+                f"{qwen_base_url}/chat/completions",
+                headers=headers,
+                json=interpretation_payload,
+                timeout=30
+            )
+
+            interpretation_response.raise_for_status()
+            interpretation_data = interpretation_response.json()
+
+            if 'choices' in interpretation_data and len(interpretation_data['choices']) > 0:
+                interpreted_symbol = interpretation_data['choices'][0]['message']['content'].strip()
+                
+                # Now fetch the actual data for the interpreted symbol
+                data = get_stock_data(interpreted_symbol)
                 
                 if data:
-                    # Determine if it's stock or cryptocurrency data for appropriate formatting
-                    is_crypto = 'market' in data  # Cryptocurrency data has 'market' field
-                    
-                    if is_crypto:
-                        # Format cryptocurrency data
-                        crypto_info = f" cryptocurrency: {data.get('symbol')}/{data.get('market')}\n" \
-                                    f"Current Price: {data.get('price', 'N/A')} {data.get('market')}\n" \
-                                    f"Bid Price: {data.get('open', 'N/A')} {data.get('market')}\n" \
-                                    f"Ask Price: {data.get('high', 'N/A')} {data.get('market')}\n" \
-                                    f"Last Refreshed: {data.get('last_refreshed', 'N/A')}\n" \
+                    # Format the data appropriately based on type
+                    if '-USD' in interpreted_symbol or interpreted_symbol in ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD']:
+                        # Format cryptocurrency or precious metals data
+                        asset_info = f"Asset: {data.get('symbol')}\n" \
+                                    f"Current Price: {data.get('price', 'N/A')}\n" \
+                                    f"Today's High: {data.get('high', 'N/A')}\n" \
+                                    f"Today's Low: {data.get('low', 'N/A')}\n" \
+                                    f"Change: {data.get('change', 'N/A')} ({data.get('change_percent', 'N/A')})\n" \
+                                    f"Volume: {data.get('volume', 'N/A')}\n" \
+                                    f"Previous Close: {data.get('previous_close', 'N/A')}\n" \
                                     f"Summary: {data.get('summary', 'N/A')}"
                         
-                        # Create a detailed prompt for the Qwen API
-                        prompt = f"Based on the following cryptocurrency data:\n{crypto_info}\n\n" \
-                                 f"Answer the user's query: '{user_message}'\n\n" \
-                                 f"Provide a comprehensive and helpful response about this cryptocurrency."
+                        # Use the configured prompt template
+                        prompt = ASSET_INFO_PROMPT_TEMPLATE.format(
+                            asset_type="asset",
+                            asset_info=asset_info,
+                            user_message=user_message
+                        )
                     else:
                         # Format stock data
                         stock_info = f"Stock: {data.get('symbol')}\n" \
@@ -136,31 +169,34 @@ def generate_response_with_qwen(user_message, context):
                                     f"Previous Close: ${data.get('previous_close', 'N/A')}\n" \
                                     f"Summary: {data.get('summary', 'N/A')}"
                         
-                        # Create a detailed prompt for the Qwen API
-                        prompt = f"Based on the following stock data:\n{stock_info}\n\n" \
-                                 f"Answer the user's query: '{user_message}'\n\n" \
-                                 f"Provide a comprehensive and helpful response about this stock."
+                        # Use the configured prompt template
+                        prompt = STOCK_INFO_PROMPT_TEMPLATE.format(
+                            stock_info=stock_info,
+                            user_message=user_message
+                        )
                 else:
-                    prompt = f"The user asked about the symbol '{symbol}', which could be a stock or cryptocurrency, but I couldn't retrieve the data. " \
-                             f"Please inform the user that the symbol might be incorrect or unavailable, " \
-                             f"and suggest they check the symbol and try again. Respond to their query: '{user_message}'"
+                    # Use the fallback prompt template
+                    prompt = FALLBACK_PROMPT_TEMPLATE.format(
+                        user_message=user_message,
+                        interpreted_symbol=interpreted_symbol
+                    )
             else:
-                prompt = f"The user's query is: '{user_message}'. " \
-                         f"It seems to be related to financial assets, but no specific symbol was provided. " \
-                         f"Please ask the user to specify a symbol (e.g., AAPL, BTC, ETH) for more accurate information."
+                # Use the no-symbol prompt template
+                prompt = NO_SYMBOL_PROMPT_TEMPLATE.format(user_message=user_message)
         else:
             # For non-stock/cryptocurrency related queries, create a context-aware prompt
             context_str = "\n".join([f"User: {item['user_message']}\nBot: {item['bot_response']}" 
                                      for item in context[-5:]])  # Use last 5 exchanges as context
             
-            prompt = f"Context from previous conversation:\n{context_str}\n\n" \
-                     f"Current user query: '{user_message}'\n\n" \
-                     f"Please provide a helpful response related to trading, finance, or markets. " \
-                     f"If the query is not related to trading or finance, politely redirect to those topics."
+            # Use the general chat prompt template
+            prompt = GENERAL_CHAT_PROMPT_TEMPLATE.format(
+                context_str=context_str,
+                user_message=user_message
+            )
         
         logger.info(f"Qwen API request prompt: {prompt}")
         
-        # Prepare headers and payload for the API request
+        # Prepare headers and payload for the main API request
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {qwen_api_key}"
