@@ -42,9 +42,11 @@ def create_app():
     # Register blueprints - use absolute imports to avoid relative import issues
     from trade_chatbot.backend.api.chat import chat_bp
     from trade_chatbot.backend.api.data import data_bp
+    from trade_chatbot.backend.api.mcp import mcp_bp
     
     app.register_blueprint(chat_bp, url_prefix='/api')
     app.register_blueprint(data_bp, url_prefix='/api')
+    app.register_blueprint(mcp_bp, url_prefix='/api/mcp')
     
     return app
 

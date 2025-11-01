@@ -7,6 +7,7 @@ A web-based chatbot for trading and financial data queries with context engineer
 - Web-based chat interface similar to ChatGPT with left-aligned markdown rendering
 - Context management to maintain conversation history
 - Integration with Yahoo Finance for real-time stock, cryptocurrency, and precious metals data
+- Alpha Vantage MCP server integration as a fallback data source
 - Qwen AI integration for advanced natural language understanding
 - Ability to interpret natural language queries and map them to appropriate financial symbols (e.g., "gold" to XAUUSD, "bitcoin" to BTC-USD)
 - Support for multiple asset types including stocks, cryptocurrencies, precious metals, and forex pairs
@@ -79,6 +80,14 @@ The frontend will start on `http://localhost:3000` and will proxy API requests t
 ### Stock Data Endpoint
 - **GET** `/api/data/stock/{symbol}`
 - Response: Stock information for the given symbol
+
+### MCP (Model Context Protocol) Endpoints
+- **GET** `/api/mcp/quote?symbol={symbol}`
+  - Get quote for a given symbol from Alpha Vantage MCP server
+- **GET** `/api/mcp/time_series_daily?symbol={symbol}`
+  - Get daily time series data for a given symbol from Alpha Vantage MCP server
+- **GET** `/api/mcp/sector`
+  - Get sector performance data from Alpha Vantage MCP server
 
 ## Context Engineering
 
