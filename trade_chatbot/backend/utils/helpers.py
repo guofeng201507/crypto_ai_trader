@@ -25,6 +25,9 @@ ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query'
 # Yahoo Finance configuration
 YAHOO_FINANCE_BASE_URL = 'https://query1.finance.yahoo.com/v8/finance/chart/'
 
+# Alpha Vantage MCP configuration
+MCP_BASE_URL = 'https://mcp.alphavantage.co/mcp'
+
 def get_yahoo_finance_data(symbol: str) -> Optional[Dict]:
     """
     Get stock or cryptocurrency data for a given symbol using Yahoo Finance API
@@ -146,7 +149,7 @@ def get_crypto_data(symbol: str, market: str = "USD") -> Optional[Dict]:
 
 def get_stock_data(symbol: str) -> Optional[Dict]:
     """
-    Get data for a given symbol (stock, crypto, or precious metals) using Yahoo Finance API
+    Get data for a given symbol (stock, crypto, or precious metals) using Yahoo Finance API as primary and MCP as fallback
     """
     logger.info(f"Fetching data for symbol: {symbol}")
     
@@ -161,25 +164,51 @@ def get_stock_data(symbol: str) -> Optional[Dict]:
     # Handle precious metals symbols (e.g., XAUUSD, XAGUSD, etc.)
     if symbol_upper in precious_metals:
         logger.info(f"Detected precious metal symbol: {symbol}, using Yahoo Finance API directly")
-        return get_yahoo_finance_data(symbol_upper)
+        yahoo_result = get_yahoo_finance_data(symbol_upper)
+        if yahoo_result:
+            return yahoo_result
+        else:
+            # Fallback to MCP server if Yahoo Finance fails
+            logger.info(f"Yahoo Finance failed for {symbol}, trying MCP server as fallback")
+            return get_mcp_data(symbol_upper)
     
     # Check if it's a crypto symbol in the form BTC-USD, ETH-USD, etc.
     if '-' in symbol_upper and symbol_upper.split('-')[0] in crypto_symbols:
         logger.info(f"Detected cryptocurrency symbol in format: {symbol}, using crypto API")
-        return get_crypto_data(symbol_upper.split('-')[0], symbol_upper.split('-')[1])  # Extract base and quote currencies
+        result = get_crypto_data(symbol_upper.split('-')[0], symbol_upper.split('-')[1])  # Extract base and quote currencies
+        if result:
+            return result
+        else:
+            # Fallback to MCP server if Yahoo Finance fails
+            logger.info(f"Crypto data failed for {symbol}, trying MCP server as fallback")
+            return get_mcp_data(symbol_upper.split('-')[0])  # Use just the base currency for MCP
     
     # Check if the symbol is likely a cryptocurrency in short format (e.g., BTC, ETH)
     if symbol_upper in crypto_symbols:
         logger.info(f"Detected cryptocurrency symbol: {symbol}, using crypto API")
-        return get_crypto_data(symbol_upper)
+        result = get_crypto_data(symbol_upper)
+        if result:
+            return result
+        else:
+            # Fallback to MCP server
+            logger.info(f"Crypto data failed for {symbol}, trying MCP server as fallback")
+            return get_mcp_data(symbol_upper)
     
-    # For stocks and other symbols, use Yahoo Finance directly
+    # For stocks and other symbols, use Yahoo Finance as primary
     try:
         logger.info(f"Using Yahoo Finance API for symbol: {symbol}")
-        return get_yahoo_finance_data(symbol_upper)
+        yahoo_result = get_yahoo_finance_data(symbol_upper)
+        if yahoo_result:
+            return yahoo_result
+        else:
+            # Fallback to MCP server if Yahoo Finance fails
+            logger.info(f"Yahoo Finance failed for {symbol}, trying MCP server as fallback")
+            return get_mcp_data(symbol_upper)
     except Exception as e:
-        logger.error(f"Exception occurred while fetching data for {symbol}: {str(e)}")
-        return None
+        logger.error(f"Exception occurred while fetching data for {symbol} from Yahoo Finance: {str(e)}")
+        # Fallback to MCP server if Yahoo Finance fails
+        logger.info(f"Trying MCP server as fallback for {symbol}")
+        return get_mcp_data(symbol_upper)
 
 def get_historical_data(symbol: str, outputsize: str = "compact", datatype: str = "json") -> Optional[Dict]:
     """
@@ -226,4 +255,91 @@ def get_historical_data(symbol: str, outputsize: str = "compact", datatype: str 
             return None
     except Exception as e:
         logger.error(f"Exception occurred while fetching historical data for {symbol}: {str(e)}")
+        return None
+
+
+def get_mcp_data(symbol: str) -> Optional[Dict]:
+    """
+    Get stock data using the Alpha Vantage MCP server
+    """
+    import json
+    logger.info(f"Fetching data for symbol: {symbol} from Alpha Vantage MCP server")
+    
+    api_key = os.environ.get('ALPHA_VANTAGE_API_KEY', '20KCRQCE82CTCDVI')
+    mcp_url = MCP_BASE_URL
+    
+    # Prepare the JSON-RPC request
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "alpha_vantage.global_quote",
+        "params": {
+            "symbol": symbol
+        },
+        "id": 1
+    }
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    
+    try:
+        logger.info(f"Making JSON-RPC request to: {mcp_url}")
+        logger.info(f"Payload: {payload}")
+        
+        response = requests.post(
+            mcp_url,
+            json=payload,
+            headers=headers,
+            timeout=30
+        )
+        
+        logger.info(f"MCP server response status: {response.status_code}")
+        
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                logger.info(f"MCP server response: {data}")
+                
+                if "result" in data:
+                    # Convert Alpha Vantage format to our standard format
+                    quote_data = data["result"].get("Global Quote", {})
+                    if quote_data:
+                        result_data = {
+                            "symbol": quote_data.get("01. symbol"),
+                            "price": float(quote_data.get("05. price", 0)),
+                            "open": float(quote_data.get("02. open", 0)),
+                            "high": float(quote_data.get("03. high", 0)),
+                            "low": float(quote_data.get("04. low", 0)),
+                            "volume": int(quote_data.get("06. volume", 0)),
+                            "latest_trading_day": quote_data.get("07. latest trading day"),
+                            "previous_close": float(quote_data.get("08. previous close", 0)),
+                            "change": float(quote_data.get("09. change", 0)),
+                            "change_percent": quote_data.get("10. change percent", "0%").replace("%", ""),
+                            "summary": f"Price: ${quote_data.get('05. price', 'N/A')} "
+                                      f"Change: {quote_data.get('09. change', 'N/A')} "
+                                      f"({quote_data.get('10. change percent', 'N/A')})"
+                        }
+                        logger.info(f"Successfully parsed MCP data for {symbol}: {result_data}")
+                        return result_data
+                elif "error" in data:
+                    logger.error(f"MCP server error: {data['error']}")
+                    return None
+                else:
+                    logger.warning(f"Unexpected response format from MCP server: {data}")
+                    return None
+            except json.JSONDecodeError:
+                logger.error(f"Response from MCP server is not valid JSON: {response.text}")
+                return None
+        else:
+            logger.error(f"HTTP Error from MCP server: {response.status_code} - {response.text}")
+            return None
+            
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Network error calling MCP server: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error calling MCP server for {symbol}: {str(e)}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         return None
