@@ -205,10 +205,10 @@ def generate_response_with_qwen(user_message, context):
         payload = {
             "model": "qwen-max",  # You can change this to other available models
             "messages": [
-                {"role": "system", "content": "You are a knowledgeable trading and finance assistant. Provide accurate, helpful, and concise responses related to trading, finance, stocks, and markets. Use the provided context and data to inform your responses. Be professional and helpful."},
+                {"role": "system", "content": "You are a knowledgeable trading and finance assistant. Provide accurate, helpful, and concise responses related to trading, finance, stocks, and markets. Use the provided context and data to inform your responses. Be professional and helpful. Keep all responses under 150 words for brevity."},
                 {"role": "user", "content": prompt}
             ],
-            "max_tokens": 500,
+            "max_tokens": 200,  # Reduced token limit to enforce 150-word constraint
             "temperature": 0.7
         }
         

@@ -71,37 +71,50 @@ Follow these rules:
 - Just return the symbol and nothing else.
 """
 
-# Asset information prompt template
-ASSET_INFO_PROMPT_TEMPLATE = """Based on the following {asset_type} data:
+# Asset information prompt template - More friendly and conversation-like
+ASSET_INFO_PROMPT_TEMPLATE = """Hey there! Based on the latest market data I pulled for you:
+
 {asset_info}
 
-Answer the user's query: '{user_message}'
+Regarding your question: '{user_message}'
 
-Provide a comprehensive and helpful response about this {asset_type}."""
+Here's what I can tell you about this {asset_type} - I've kept it concise (under 150 words) so you can quickly get the info you need!"""
 
-# Stock information prompt template
-STOCK_INFO_PROMPT_TEMPLATE = """Based on the following stock data:
+# Stock information prompt template - More friendly and conversation-like
+STOCK_INFO_PROMPT_TEMPLATE = """Hey there! I've got the latest stock data for you:
+
 {stock_info}
 
-Answer the user's query: '{user_message}'
+Regarding your question: '{user_message}'
 
-Provide a comprehensive and helpful response about this stock."""
+Here's my take on this stock - quick and to the point (under 150 words)!"""
 
-# Fallback prompt when no data is found
-FALLBACK_PROMPT_TEMPLATE = """The user asked about '{user_message}', which I interpreted as the symbol '{interpreted_symbol}', but I couldn't retrieve the data. 
-Please inform the user that the symbol might be incorrect or unavailable, 
-and suggest they check the symbol and try again. Respond to their query: '{user_message}'"""
+# Fallback prompt when no data is found - More friendly and conversation-like
+FALLBACK_PROMPT_TEMPLATE = """Hmm, I had a look at '{user_message}' which I thought was about the symbol '{interpreted_symbol}', but I couldn't pull up any data. 
+This could mean the symbol is a bit off or maybe not available right now. 
 
-# Prompt for when no specific symbol is provided
-NO_SYMBOL_PROMPT_TEMPLATE = """The user's query is: '{user_message}'. 
-It seems to be related to financial assets, but I couldn't interpret the specific symbol. 
-Please ask the user to specify a symbol (e.g., AAPL, BTC, XAUUSD) for more accurate information."""
+Could you double-check the symbol and give it another shot? For example, try AAPL for Apple or BTC for Bitcoin.
 
-# General chat prompt template
-GENERAL_CHAT_PROMPT_TEMPLATE = """Context from previous conversation:
+What would you like to try instead?"""
+
+# Prompt for when no specific symbol is provided - More friendly and conversation-like
+NO_SYMBOL_PROMPT_TEMPLATE = """I see you're asking about financial assets with: '{user_message}'. 
+To give you the most accurate info, could you be a bit more specific? 
+
+For example:
+- For stocks: AAPL (Apple), MSFT (Microsoft), TSLA (Tesla)
+- For crypto: BTC (Bitcoin), ETH (Ethereum)
+- For metals: XAUUSD (Gold), XAGUSD (Silver)
+
+What exactly would you like to know about?"""
+
+# General chat prompt template - More friendly and conversation-like
+GENERAL_CHAT_PROMPT_TEMPLATE = """Here's what we've talked about recently:
 {context_str}
 
-Current user query: '{user_message}'
+Now you're asking: '{user_message}'
 
-Please provide a helpful response related to trading, finance, or markets. 
-If the query is not related to trading or finance, politely redirect to those topics."""
+As your trading assistant, I'll keep this under 150 words so it's easy to digest. 
+Let me give you a quick, helpful response about trading, finance, or markets!
+
+If your question isn't related to those areas, I'll gently steer you back to topics I can really help with."""
