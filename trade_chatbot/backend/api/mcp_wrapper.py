@@ -1,6 +1,36 @@
 """
 MCP (Model Context Protocol) server wrapper for Alpha Vantage API
 This module provides an MCP-compatible interface that wraps the standard Alpha Vantage API
+
+Supported MCP Methods:
+---------------------
+1. av.function.global_quote
+   - Get real-time quote data for stocks, ETFs, mutual funds, etc.
+   - Parameters: symbol (required)
+   
+2. av.function.time_series_daily
+   - Get daily time series data (open, high, low, close, volume)
+   - Parameters: symbol (required), outputsize (optional)
+   
+3. av.function.symbol_search
+   - Search for stock symbols by keywords
+   - Parameters: keywords (required)
+   
+4. av.function.currency_exchange_rate
+   - Get real-time exchange rates between currencies
+   - Parameters: from_currency (required), to_currency (optional)
+   
+5. av.function.crypto_overview
+   - Get cryptocurrency exchange rates
+   - Parameters: symbol (required), market (optional)
+   
+6. av.function.news_sentiment
+   - Get live news sentiment and anomaly detection
+   - Parameters: tickers (optional), topics (optional), time_from (optional), 
+                time_to (optional), sort (optional), limit (optional)
+
+All methods follow JSON-RPC 2.0 specification with automatic key rotation
+for rate limit protection.
 """
 import requests
 import os
@@ -229,6 +259,33 @@ def mcp_handler():
             result = call_standard_alpha_vantage_api('CURRENCY_EXCHANGE_RATE', 
                                                     from_currency=symbol, 
                                                     to_currency=market)
+                                                    
+        elif method == 'av.function.news_sentiment':
+            # Handle news sentiment request
+            tickers = params.get('tickers')
+            topics = params.get('topics')
+            time_from = params.get('time_from')
+            time_to = params.get('time_to')
+            sort = params.get('sort', 'LATEST')
+            limit = params.get('limit', 50)
+            
+            # Build parameters for news sentiment API call
+            news_params = {}
+            if tickers:
+                news_params['tickers'] = tickers
+            if topics:
+                news_params['topics'] = topics
+            if time_from:
+                news_params['time_from'] = time_from
+            if time_to:
+                news_params['time_to'] = time_to
+            if sort:
+                news_params['sort'] = sort
+            if limit:
+                news_params['limit'] = limit
+                
+            result = call_standard_alpha_vantage_api('NEWS_SENTIMENT', **news_params)
+            
         else:
             # Unknown method
             return jsonify({

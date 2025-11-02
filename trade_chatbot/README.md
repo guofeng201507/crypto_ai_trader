@@ -92,6 +92,7 @@ The frontend will start on `http://localhost:3000` and will proxy API requests t
   - `av.function.symbol_search` - Search for symbols by keywords
   - `av.function.currency_exchange_rate` - Get currency exchange rates
   - `av.function.crypto_overview` - Get cryptocurrency overview
+  - `av.function.news_sentiment` - Get live news sentiment and anomaly detection
 
 ## Context Engineering
 
