@@ -8,6 +8,7 @@ This directory contains unit tests and integration tests for the trade chatbot a
 tests/
 ├── test_natural_language_processing.py  # Tests for natural language query interpretation
 ├── test_mcp_wrapper.py                   # Tests for Alpha Vantage MCP wrapper
+├── test_news_sentiment.py                # Tests for Alpha Vantage news sentiment functionality
 ├── test_key_rotation.py                  # Tests for Alpha Vantage API key rotation
 ├── conftest.py                           # pytest configuration
 └── __init__.py                          # Package initialization
@@ -35,6 +36,7 @@ To run specific test files:
 cd trade_chatbot
 pytest tests/test_natural_language_processing.py
 pytest tests/test_mcp_wrapper.py
+pytest tests/test_news_sentiment.py
 pytest tests/test_key_rotation.py
 ```
 
@@ -54,6 +56,11 @@ pytest tests/ --cov=backend --cov-report=html
 ### MCP Wrapper Tests
 - `test_mcp_wrapper.py`: Tests for the Alpha Vantage MCP wrapper implementation
 - Verifies JSON-RPC 2.0 compliance and correct method routing
+
+### News Sentiment Tests
+- `test_news_sentiment.py`: Tests for the Alpha Vantage news sentiment functionality
+- Verifies that news sentiment data can be retrieved through the MCP wrapper
+- Tests various parameter combinations for news sentiment requests
 
 ### Key Rotation Tests
 - `test_key_rotation.py`: Tests for Alpha Vantage API key rotation system
