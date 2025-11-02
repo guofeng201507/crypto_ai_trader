@@ -82,15 +82,41 @@ The frontend will start on `http://localhost:3000` and will proxy API requests t
 - **GET** `/api/data/stock/{symbol}`
 - Response: Stock information for the given symbol
 
-### MCP (Model Context Protocol) Endpoints
-- **GET** `/api/mcp/quote?symbol={symbol}`
-  - Get quote for a given symbol from Alpha Vantage MCP server (currently not active)
-- **GET** `/api/mcp/time_series_daily?symbol={symbol}`
-  - Get daily time series data for a given symbol from Alpha Vantage MCP server (currently not active)
-- **GET** `/api/mcp/sector`
-  - Get sector performance data from Alpha Vantage MCP server (currently not active)
+### Alpha Vantage MCP Wrapper Endpoint
+- **POST** `/api/mcp_wrapper`
+- Implements the Model Context Protocol (MCP) to wrap Alpha Vantage API
+- Accepts JSON-RPC 2.0 requests with standard Alpha Vantage functions
+- Methods supported:
+  - `av.function.global_quote` - Get real-time quote data for a symbol
+  - `av.function.time_series_daily` - Get daily time series data
+  - `av.function.symbol_search` - Search for symbols by keywords
+  - `av.function.currency_exchange_rate` - Get currency exchange rates
+  - `av.function.crypto_overview` - Get cryptocurrency overview
 
-> **Note**: The MCP server endpoints are implemented but currently not active, as the Alpha Vantage MCP service doesn't support the expected methods. The system falls back to Yahoo Finance which provides reliable data for most assets.
+## Context Engineering
+
+The chatbot maintains conversation context for each user to provide more relevant responses based on previous interactions. Context is stored in the `context_storage` directory by default.
+
+## Data Sources
+
+### Yahoo Finance Integration
+
+The system integrates with Yahoo Finance API to retrieve real-time and historical financial data for stocks, cryptocurrencies, precious metals, and forex pairs. This is the primary data source for most financial assets.
+
+### Alpha Vantage API Integration
+
+Alpha Vantage API is integrated through both standard REST API calls and our custom MCP wrapper. The standard API provides access to comprehensive financial data, while our MCP wrapper allows AI agents to access the same data through the Model Context Protocol.
+
+### Custom MCP Wrapper for Alpha Vantage
+
+Instead of relying on Alpha Vantage's own MCP server (which may not be fully functional), we've implemented our own MCP-compatible wrapper that:
+
+1. Follows the JSON-RPC 2.0 specification
+2. Provides MCP-style method names (e.g., `av.function.global_quote`)
+3. Wraps the standard Alpha Vantage API
+4. Allows AI agents to access financial data through the Model Context Protocol
+
+This approach gives us complete control over the MCP implementation and ensures compatibility with AI agent frameworks that support MCP.
 
 ## Context Engineering
 

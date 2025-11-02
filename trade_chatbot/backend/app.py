@@ -43,10 +43,12 @@ def create_app():
     from trade_chatbot.backend.api.chat import chat_bp
     from trade_chatbot.backend.api.data import data_bp
     from trade_chatbot.backend.api.mcp import mcp_bp
+    from trade_chatbot.backend.api.mcp_wrapper import mcp_wrapper_bp
     
     app.register_blueprint(chat_bp, url_prefix='/api')
     app.register_blueprint(data_bp, url_prefix='/api')
     app.register_blueprint(mcp_bp, url_prefix='/api/mcp')
+    app.register_blueprint(mcp_wrapper_bp, url_prefix='/api/mcp_wrapper')  # This will be our new MCP-compatible endpoint
     
     return app
 
