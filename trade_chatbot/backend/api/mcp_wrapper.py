@@ -286,6 +286,28 @@ def mcp_handler():
                 
             result = call_standard_alpha_vantage_api('NEWS_SENTIMENT', **news_params)
             
+            # Format the response to be more concise (under 150 words)
+            if result and "feed" in result:
+                # Get just the first few news items for a concise response
+                feed_items = result["feed"][:3]  # Limit to first 3 items
+                concise_response = {
+                    "symbol": params.get("tickers", params.get("topics", "NEWS")),
+                    "total_articles": len(result["feed"]),
+                    "latest_articles": []
+                }
+                
+                for item in feed_items:
+                    # Create a concise summary of each article
+                    article_summary = {
+                        "title": item.get("title", "")[:50] + "..." if len(item.get("title", "")) > 50 else item.get("title", ""),
+                        "sentiment": item.get("overall_sentiment_label", "Neutral"),
+                        "score": round(float(item.get("overall_sentiment_score", 0)), 2),
+                        "published": item.get("time_published", "")[:16] if item.get("time_published") else "N/A"
+                    }
+                    concise_response["latest_articles"].append(article_summary)
+                    
+                result = concise_response
+            
         else:
             # Unknown method
             return jsonify({
