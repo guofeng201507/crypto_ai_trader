@@ -42,6 +42,66 @@ YAHOO_FINANCE_BASE_URL = 'https://query1.finance.yahoo.com/v8/finance/chart/'
 # Alpha Vantage MCP configuration
 MCP_BASE_URL = 'http://localhost:5001/api/mcp_wrapper'
 
+def format_asset_info(asset_data: Dict, symbol: str) -> str:
+    """
+    Format asset information into a concise string (under 150 words)
+    """
+    if not asset_data:
+        return f"Sorry, I couldn't retrieve data for {symbol}."
+    
+    # Extract key information
+    price = asset_data.get('price', 'N/A')
+    change = asset_data.get('change', 'N/A')
+    change_percent = asset_data.get('change_percent', 'N/A')
+    volume = asset_data.get('volume', 'N/A')
+    high = asset_data.get('high', 'N/A')
+    low = asset_data.get('low', 'N/A')
+    
+    # Create a concise summary (aiming for under 150 words)
+    if symbol.endswith('-USD') or symbol in ['BTC-USD', 'ETH-USD', 'XAUUSD', 'XAGUSD']:
+        # Crypto or precious metals
+        summary = f"{symbol}: ${price} "
+        if change != 'N/A':
+            summary += f"(Change: ${change} | {change_percent}%) "
+        if volume != 'N/A' and volume != 0:
+            summary += f"| Vol: {volume} "
+        if high != 'N/A':
+            summary += f"| High: ${high} | Low: ${low}"
+    else:
+        # Stocks
+        summary = f"{symbol}: ${price} "
+        if change != 'N/A':
+            summary += f"(Change: ${change} | {change_percent}%) "
+        if volume != 'N/A' and volume != 0:
+            summary += f"| Vol: {volume:,} "
+        if high != 'N/A':
+            summary += f"| High: ${high} | Low: ${low}"
+    
+    # Ensure the summary is concise
+    if len(summary) > 200:  # Allow some buffer
+        summary = summary[:197] + "..."
+        
+    return summary
+
+def format_stock_info(stock_data: Dict, symbol: str) -> str:
+    """
+    Format stock information into a concise string (under 150 words)
+    """
+    return format_asset_info(stock_data, symbol)
+
+def format_crypto_info(crypto_data: Dict, symbol: str) -> str:
+    """
+    Format cryptocurrency information into a concise string (under 150 words)
+    """
+    return format_asset_info(crypto_data, symbol)
+
+def format_precious_metal_info(metal_data: Dict, symbol: str) -> str:
+    """
+    Format precious metal information into a concise string (under 150 words)
+    """
+    return format_asset_info(metal_data, symbol)
+
+
 def call_alpha_vantage_api_with_retry(function: str, max_retries: int = 3, **params) -> Optional[Dict]:
     """
     Call the Alpha Vantage API with automatic key rotation on rate limit errors

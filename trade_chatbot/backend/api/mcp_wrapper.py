@@ -58,9 +58,9 @@ logger = logging.getLogger(__name__)
 # Configure Alpha Vantage API
 ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query'
 
-# Initialize key manager with multiple API keys
-api_keys = os.environ.get('ALPHA_VANTAGE_API_KEYS', '20KCRQCE82CTCDVI,8DW7GH8FIZDXGFHC').split(',')
-api_keys = [key.strip() for key in api_keys if key.strip()]
+# Initialize key manager with multiple API keys from environment variable
+api_keys_env = os.environ.get('ALPHA_VANTAGE_API_KEYS', '20KCRQCE82CTCDVI,8DW7GH8FIZDXGFHC')
+api_keys = [key.strip() for key in api_keys_env.split(',') if key.strip()]
 initialize_key_manager(api_keys)
 
 # Create the MCP wrapper blueprint
