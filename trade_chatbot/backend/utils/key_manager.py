@@ -97,30 +97,33 @@ class AlphaVantageKeyManager:
             
         # Check for rate limit error messages
         if "Error Message" in response_data:
-            error_msg = response_data["Error Message"].lower()
+            error_msg = str(response_data["Error Message"]).lower()
             return (
                 "rate limit" in error_msg or 
                 "api call frequency" in error_msg or
                 "exceeded" in error_msg or
-                "limit" in error_msg
+                "limit" in error_msg or
+                "too many requests" in error_msg
             )
             
         if "Information" in response_data:
-            info_msg = response_data["Information"].lower()
+            info_msg = str(response_data["Information"]).lower()
             return (
                 "rate limit" in info_msg or 
                 "api call frequency" in info_msg or
                 "exceeded" in info_msg or
-                "limit" in info_msg
+                "limit" in info_msg or
+                "too many requests" in info_msg
             )
             
         if "Note" in response_data:
-            note_msg = response_data["Note"].lower()
+            note_msg = str(response_data["Note"]).lower()
             return (
                 "rate limit" in note_msg or 
                 "api call frequency" in note_msg or
                 "exceeded" in note_msg or
-                "limit" in note_msg
+                "limit" in note_msg or
+                "too many requests" in note_msg
             )
             
         return False
