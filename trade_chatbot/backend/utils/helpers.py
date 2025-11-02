@@ -26,7 +26,7 @@ ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query'
 YAHOO_FINANCE_BASE_URL = 'https://query1.finance.yahoo.com/v8/finance/chart/'
 
 # Alpha Vantage MCP configuration
-MCP_BASE_URL = 'https://mcp.alphavantage.co/mcp'
+MCP_BASE_URL = 'http://localhost:5001/api/mcp_wrapper'
 
 def get_yahoo_finance_data(symbol: str) -> Optional[Dict]:
     """
@@ -260,173 +260,129 @@ def get_historical_data(symbol: str, outputsize: str = "compact", datatype: str 
 
 def get_mcp_data(symbol: str) -> Optional[Dict]:
     """
-    Get stock data using the Alpha Vantage MCP server
-    Based on the official Alpha Vantage documentation and MCP specifications
+    Get stock data using our own MCP wrapper for Alpha Vantage API
+    This implements the Model Context Protocol (MCP) to wrap the standard Alpha Vantage API
     """
     import json
-    logger.info(f"Fetching data for symbol: {symbol} from Alpha Vantage MCP server")
+    logger.info(f"Fetching data for symbol: {symbol} from our Alpha Vantage MCP wrapper")
     
-    api_key = os.environ.get('ALPHA_VANTAGE_API_KEY', '20KCRQCE82CTCDVI')
-    mcp_url = MCP_BASE_URL
+    # Use our own MCP wrapper endpoint instead of the external one
+    mcp_url = "http://localhost:5001/api/mcp_wrapper"
     
-    # According to MCP specifications, the method format might be different
-    # Try the most likely method based on Alpha Vantage documentation
-    methods_to_try = [
-        # Standard Alpha Vantage functions adapted to MCP format
-        "av.function.global_quote",
-        "av.function.time_series_daily",
-        "av.function.symbol_search",
-        "av.function.currency_exchange_rate",
-        "av.function.crypto_overview",
-        # Alternative formats from MCP documentation
-        "av.global_quote",
-        "av.time_series_daily",
-        "av.quote",
-        "alpha_vantage.global_quote",
-        "alpha_vantage.TIME_SERIES_DAILY",
-        # Generic function name that might work
-        "get_global_quote",
-        "get_quote",
-        "quote"
-    ]
+    # Define the method to call in our MCP wrapper
+    method = "av.function.global_quote"
     
     headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}"
+        "Content-Type": "application/json"
     }
     
-    # Try each potential method
-    for method in methods_to_try:
-        logger.info(f"Trying MCP method: {method}")
-        
-        # Prepare the JSON-RPC request with appropriate parameters
-        # Following MCP specification patterns
-        if any(m in method.lower() for m in ["global_quote", "quote"]):
-            params = {"function": "GLOBAL_QUOTE", "symbol": symbol}
-        elif "time_series" in method.lower():
-            params = {"function": "TIME_SERIES_DAILY", "symbol": symbol, "outputsize": "compact"}
-        elif "search" in method.lower():
-            params = {"function": "SYMBOL_SEARCH", "keywords": symbol}
-        elif "currency" in method.lower() or "exchange" in method.lower():
-            # For currency pairs
-            if symbol and "/" in symbol:
-                parts = symbol.split("/")
-                params = {"function": "CURRENCY_EXCHANGE_RATE", "from_currency": parts[0], "to_currency": parts[1]}
-            else:
-                params = {"function": "CURRENCY_EXCHANGE_RATE", "from_currency": symbol, "to_currency": "USD"}
-        elif "crypto" in method.lower():
-            params = {"function": "CRYPTO_OVERVIEW", "symbol": symbol, "market": "USD"}
-        else:
-            # Default to global quote
-            params = {"function": "GLOBAL_QUOTE", "symbol": symbol}
-            
-        payload = {
-            "jsonrpc": "2.0",
-            "method": method,
-            "params": params,
-            "id": 1
-        }
-        
-        try:
-            logger.info(f"Making JSON-RPC request to: {mcp_url}")
-            logger.info(f"Payload: {payload}")
-            
-            response = requests.post(
-                mcp_url,
-                json=payload,
-                headers=headers,
-                timeout=30
-            )
-            
-            logger.info(f"MCP server response status: {response.status_code}")
-            
-            if response.status_code == 200:
-                try:
-                    data = response.json()
-                    logger.info(f"MCP server response: {data}")
-                    
-                    if "result" in data:
-                        # Return the raw result for further processing
-                        result_data = {
-                            "symbol": symbol,
-                            "raw_data": data["result"],
-                            "source": "mcp"
-                        }
-                        
-                        # Try to extract standard fields if available
-                        if "Global Quote" in data["result"]:
-                            quote_data = data["result"]["Global Quote"]
-                            result_data.update({
-                                "symbol": quote_data.get("01. symbol"),
-                                "price": float(quote_data.get("05. price", 0)),
-                                "open": float(quote_data.get("02. open", 0)),
-                                "high": float(quote_data.get("03. high", 0)),
-                                "low": float(quote_data.get("04. low", 0)),
-                                "volume": int(quote_data.get("06. volume", 0)),
-                                "latest_trading_day": quote_data.get("07. latest trading day"),
-                                "previous_close": float(quote_data.get("08. previous close", 0)),
-                                "change": float(quote_data.get("09. change", 0)),
-                                "change_percent": quote_data.get("10. change percent", "0%").replace("%", ""),
-                                "summary": f"Price: ${quote_data.get('05. price', 'N/A')} "
-                                          f"Change: {quote_data.get('09. change', 'N/A')} "
-                                          f"({quote_data.get('10. change percent', 'N/A')})"
-                            })
-                        elif "Time Series (Daily)" in data["result"]:
-                            # Extract latest daily data
-                            time_series = data["result"]["Time Series (Daily)"]
-                            latest_date = sorted(time_series.keys())[-1]  # Most recent date
-                            latest_data = time_series[latest_date]
-                            result_data.update({
-                                "symbol": data["result"].get("Meta Data", {}).get("2. Symbol", symbol),
-                                "price": float(latest_data.get("4. close", 0)),
-                                "open": float(latest_data.get("1. open", 0)),
-                                "high": float(latest_data.get("2. high", 0)),
-                                "low": float(latest_data.get("3. low", 0)),
-                                "volume": int(latest_data.get("5. volume", 0)),
-                                "latest_trading_day": latest_date
-                            })
-                        
-                        logger.info(f"Successfully parsed MCP data for {symbol}: {result_data}")
-                        return result_data
-                    elif "error" in data:
-                        logger.info(f"MCP server returned error for method {method}: {data['error']}")
-                        # Continue to try the next method
-                        continue
-                    else:
-                        logger.warning(f"Unexpected response format from MCP server for method {method}: {data}")
-                        # Continue to try the next method
-                        continue
-                except json.JSONDecodeError:
-                    logger.error(f"Response from MCP server is not valid JSON: {response.text}")
-                    # Continue to try the next method
-                    continue
-            elif response.status_code == 404:
-                try:
-                    error_data = response.json()
-                    if "error" in error_data and "Method not found" in error_data["error"]["message"]:
-                        logger.debug(f"MCP server does not support the method: {method}. Response: {error_data}")
-                        # Continue to try the next method
-                        continue
-                except json.JSONDecodeError:
-                    logger.error(f"Response from MCP server is not valid JSON: {response.text}")
-                    # Continue to try the next method
-                    continue
-            else:
-                logger.error(f"HTTP Error from MCP server for method {method}: {response.status_code} - {response.text}")
-                # Continue to try the next method
-                continue
-                
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Network error calling MCP server with method {method}: {str(e)}")
-            # Continue to try the next method
-            continue
-        except Exception as e:
-            logger.error(f"Unexpected error calling MCP server for {method}: {str(e)}")
-            import traceback
-            logger.error(f"Full traceback: {traceback.format_exc()}")
-            # Continue to try the next method
-            continue
+    # Prepare the JSON-RPC request
+    payload = {
+        "jsonrpc": "2.0",
+        "method": method,
+        "params": {
+            "symbol": symbol
+        },
+        "id": 1
+    }
     
-    # If all methods have been tried and failed
-    logger.warning(f"All MCP methods failed for symbol {symbol}. MCP server may not be active or supporting these methods.")
-    return None
+    try:
+        logger.info(f"Making JSON-RPC request to our MCP wrapper: {mcp_url}")
+        logger.info(f"Payload: {payload}")
+        
+        response = requests.post(
+            mcp_url,
+            json=payload,
+            headers=headers,
+            timeout=30
+        )
+        
+        logger.info(f"MCP wrapper response status: {response.status_code}")
+        
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                logger.info(f"MCP wrapper response: {data}")
+                
+                if "result" in data:
+                    # Return the raw result for further processing
+                    result_data = {
+                        "symbol": symbol,
+                        "raw_data": data["result"],
+                        "source": "mcp"
+                    }
+                    
+                    # Try to extract standard fields if available
+                    if "Global Quote" in data["result"]:
+                        quote_data = data["result"]["Global Quote"]
+                        result_data.update({
+                            "symbol": quote_data.get("01. symbol"),
+                            "price": float(quote_data.get("05. price", 0)),
+                            "open": float(quote_data.get("02. open", 0)),
+                            "high": float(quote_data.get("03. high", 0)),
+                            "low": float(quote_data.get("04. low", 0)),
+                            "volume": int(quote_data.get("06. volume", 0)),
+                            "latest_trading_day": quote_data.get("07. latest trading day"),
+                            "previous_close": float(quote_data.get("08. previous close", 0)),
+                            "change": float(quote_data.get("09. change", 0)),
+                            "change_percent": quote_data.get("10. change percent", "0%").replace("%", ""),
+                            "summary": f"Price: ${quote_data.get('05. price', 'N/A')} "
+                                      f"Change: {quote_data.get('09. change', 'N/A')} "
+                                      f"({quote_data.get('10. change percent', 'N/A')})"
+                        })
+                    elif "Time Series (Daily)" in data["result"]:
+                        # Extract latest daily data
+                        time_series = data["result"]["Time Series (Daily)"]
+                        latest_date = sorted(time_series.keys())[-1]  # Most recent date
+                        latest_data = time_series[latest_date]
+                        result_data.update({
+                            "symbol": data["result"].get("Meta Data", {}).get("2. Symbol", symbol),
+                            "price": float(latest_data.get("4. close", 0)),
+                            "open": float(latest_data.get("1. open", 0)),
+                            "high": float(latest_data.get("2. high", 0)),
+                            "low": float(latest_data.get("3. low", 0)),
+                            "volume": int(latest_data.get("5. volume", 0)),
+                            "latest_trading_day": latest_date
+                        })
+                    else:
+                        # If the result is directly the quote data (without "Global Quote" wrapper)
+                        # This follows the same format as the standard API response
+                        result_data.update({
+                            "symbol": data["result"].get("01. symbol", symbol),
+                            "price": float(data["result"].get("05. price", 0)),
+                            "open": float(data["result"].get("02. open", 0)),
+                            "high": float(data["result"].get("03. high", 0)),
+                            "low": float(data["result"].get("04. low", 0)),
+                            "volume": int(data["result"].get("06. volume", 0)),
+                            "latest_trading_day": data["result"].get("07. latest trading day", ""),
+                            "previous_close": float(data["result"].get("08. previous close", 0)),
+                            "change": float(data["result"].get("09. change", 0)),
+                            "change_percent": data["result"].get("10. change percent", "0%"),
+                            "summary": f"Price: ${data['result'].get('05. price', 'N/A')} "
+                                      f"Change: {data['result'].get('09. change', 'N/A')} "
+                                      f"({data['result'].get('10. change percent', 'N/A')})"
+                        })
+                    
+                    logger.info(f"Successfully parsed MCP data for {symbol}: {result_data}")
+                    return result_data
+                elif "error" in data:
+                    logger.error(f"MCP wrapper returned error: {data['error']}")
+                    return None
+                else:
+                    logger.warning(f"Unexpected response format from MCP wrapper: {data}")
+                    return None
+            except json.JSONDecodeError:
+                logger.error(f"Response from MCP wrapper is not valid JSON: {response.text}")
+                return None
+        else:
+            logger.error(f"HTTP Error from MCP wrapper: {response.status_code} - {response.text}")
+            return None
+            
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Network error calling MCP wrapper: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error calling MCP wrapper: {str(e)}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        return None
