@@ -8,45 +8,126 @@ from flask import Blueprint, request, jsonify
 from dotenv import load_dotenv
 import logging
 import json
+import time
+from typing import Optional, Dict
 
 # Load environment variables
 load_dotenv()
 
+# Import key manager for API key rotation
+from ..utils.key_manager import (
+    initialize_key_manager,
+    get_current_key,
+    rotate_key,
+    mark_key_usage,
+    is_rate_limited_response
+)
+
 logger = logging.getLogger(__name__)
 
 # Configure Alpha Vantage API
-ALPHA_VANTAGE_API_KEY = os.environ.get('ALPHA_VANTAGE_API_KEY', '20KCRQCE82CTCDVI')
 ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query'
+
+# Initialize key manager with multiple API keys
+api_keys = os.environ.get('ALPHA_VANTAGE_API_KEYS', '20KCRQCE82CTCDVI,8DW7GH8FIZDXGFHC').split(',')
+api_keys = [key.strip() for key in api_keys if key.strip()]
+initialize_key_manager(api_keys)
 
 # Create the MCP wrapper blueprint
 mcp_wrapper_bp = Blueprint('mcp_wrapper', __name__)
+
+def call_standard_alpha_vantage_api_with_retry(function, max_retries=3, **params):
+    """
+    Call the standard Alpha Vantage API with the given function and parameters
+    with automatic key rotation on rate limit errors
+    
+    Args:
+        function: Alpha Vantage API function name
+        max_retries: Maximum number of retries with different keys
+        **params: Additional parameters for the API call
+        
+    Returns:
+        API response data or None if all retries fail
+    """
+    for attempt in range(max_retries):
+        # Get current API key
+        api_key = get_current_key()
+        logger.info(f"Attempt {attempt + 1}/{max_retries} with API key: {api_key[:5]}...")
+        
+        api_params = {
+            'function': function,
+            'apikey': api_key,
+            **params
+        }
+        
+        try:
+            response = requests.get(ALPHA_VANTAGE_BASE_URL, params=api_params, timeout=30)
+            
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    
+                    # Mark successful usage
+                    mark_key_usage(api_key)
+                    
+                    # Check if we hit a rate limit
+                    if is_rate_limited_response(data):
+                        logger.warning(f"Rate limit detected with key {api_key[:5]}... on attempt {attempt + 1}")
+                        if attempt < max_retries - 1:  # Not the last attempt
+                            # Rotate to next key and try again
+                            new_key = rotate_key()
+                            logger.info(f"Rotating to next key: {new_key[:5]}...")
+                            time.sleep(1)  # Brief pause before retry
+                            continue
+                        else:
+                            logger.error("All API keys exhausted, rate limit still hit")
+                            return data  # Return the rate limit response
+                    else:
+                        # Successful response
+                        logger.info(f"Successful API call with key {api_key[:5]}...")
+                        return data
+                        
+                except ValueError:
+                    logger.error(f"Response from Alpha Vantage is not valid JSON: {response.text}")
+                    if attempt < max_retries - 1:
+                        rotate_key()
+                        time.sleep(1)
+                        continue
+                    else:
+                        return None
+            else:
+                logger.error(f"Error from Alpha Vantage API: {response.status_code} - {response.text}")
+                if attempt < max_retries - 1:
+                    rotate_key()
+                    time.sleep(1)
+                    continue
+                else:
+                    return None
+                    
+        except requests.exceptions.Timeout:
+            logger.error(f"Timeout calling Alpha Vantage API with key {api_key[:5]}...")
+            if attempt < max_retries - 1:
+                rotate_key()
+                time.sleep(2)  # Longer pause for timeout
+                continue
+            else:
+                return None
+        except Exception as e:
+            logger.error(f"Exception calling Alpha Vantage API with key {api_key[:5]}...: {str(e)}")
+            if attempt < max_retries - 1:
+                rotate_key()
+                time.sleep(1)
+                continue
+            else:
+                return None
+    
+    return None
 
 def call_standard_alpha_vantage_api(function, **params):
     """
     Call the standard Alpha Vantage API with the given function and parameters
     """
-    api_params = {
-        'function': function,
-        'apikey': ALPHA_VANTAGE_API_KEY,
-        **params
-    }
-    
-    try:
-        response = requests.get(ALPHA_VANTAGE_BASE_URL, params=api_params)
-        
-        if response.status_code == 200:
-            try:
-                data = response.json()
-                return data
-            except ValueError:
-                logger.error(f"Response from Alpha Vantage is not valid JSON: {response.text}")
-                return None
-        else:
-            logger.error(f"Error from Alpha Vantage API: {response.status_code} - {response.text}")
-            return None
-    except Exception as e:
-        logger.error(f"Exception calling Alpha Vantage API: {str(e)}")
-        return None
+    return call_standard_alpha_vantage_api_with_retry(function, **params)
 
 @mcp_wrapper_bp.route('/', methods=['POST'])
 def mcp_handler():

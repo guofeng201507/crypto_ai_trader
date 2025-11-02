@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from typing import Dict, Optional
 import logging
 from datetime import datetime
+import time
 
 # Set up logging
 logging.basicConfig(
@@ -18,8 +19,21 @@ logger = logging.getLogger(__name__)
 # Load environment variables from .env file
 load_dotenv()
 
+# Import key manager for API key rotation
+from .key_manager import (
+    initialize_key_manager,
+    get_current_key,
+    rotate_key,
+    mark_key_usage,
+    is_rate_limited_response
+)
+
+# Initialize key manager with multiple API keys
+api_keys = os.environ.get('ALPHA_VANTAGE_API_KEYS', '20KCRQCE82CTCDVI,8DW7GH8FIZDXGFHC').split(',')
+api_keys = [key.strip() for key in api_keys if key.strip()]
+initialize_key_manager(api_keys)
+
 # Alpha Vantage configuration (keeping for backward compatibility)
-ALPHA_VANTAGE_API_KEY = os.environ.get('ALPHA_VANTAGE_API_KEY', '20KCRQCE82CTCDVI')
 ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query'
 
 # Yahoo Finance configuration
@@ -27,6 +41,98 @@ YAHOO_FINANCE_BASE_URL = 'https://query1.finance.yahoo.com/v8/finance/chart/'
 
 # Alpha Vantage MCP configuration
 MCP_BASE_URL = 'http://localhost:5001/api/mcp_wrapper'
+
+def call_alpha_vantage_api_with_retry(function: str, max_retries: int = 3, **params) -> Optional[Dict]:
+    """
+    Call the Alpha Vantage API with automatic key rotation on rate limit errors
+    
+    Args:
+        function: Alpha Vantage API function name
+        max_retries: Maximum number of retries with different keys
+        **params: Additional parameters for the API call
+        
+    Returns:
+        API response data or None if all retries fail
+    """
+    for attempt in range(max_retries):
+        # Get current API key
+        api_key = get_current_key()
+        logger.info(f"Calling Alpha Vantage API (attempt {attempt + 1}/{max_retries}) with key: {api_key[:5]}...")
+        
+        api_params = {
+            'function': function,
+            'apikey': api_key,
+            **params
+        }
+        
+        try:
+            response = requests.get(ALPHA_VANTAGE_BASE_URL, params=api_params, timeout=30)
+            
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    
+                    # Mark successful usage
+                    mark_key_usage(api_key)
+                    
+                    # Check if we hit a rate limit
+                    if is_rate_limited_response(data):
+                        logger.warning(f"Rate limit detected with key {api_key[:5]}... on attempt {attempt + 1}")
+                        if attempt < max_retries - 1:  # Not the last attempt
+                            # Rotate to next key and try again
+                            new_key = rotate_key()
+                            logger.info(f"Rotating to next key: {new_key[:5]}...")
+                            time.sleep(1)  # Brief pause before retry
+                            continue
+                        else:
+                            logger.error("All API keys exhausted, rate limit still hit")
+                            return data  # Return the rate limit response
+                    else:
+                        # Successful response
+                        logger.info(f"Successful Alpha Vantage API call with key {api_key[:5]}...")
+                        return data
+                        
+                except ValueError:
+                    logger.error(f"Response from Alpha Vantage is not valid JSON: {response.text}")
+                    if attempt < max_retries - 1:
+                        rotate_key()
+                        time.sleep(1)
+                        continue
+                    else:
+                        return None
+            else:
+                logger.error(f"Error from Alpha Vantage API: {response.status_code} - {response.text}")
+                if attempt < max_retries - 1:
+                    rotate_key()
+                    time.sleep(1)
+                    continue
+                else:
+                    return None
+                    
+        except requests.exceptions.Timeout:
+            logger.error(f"Timeout calling Alpha Vantage API with key {api_key[:5]}...")
+            if attempt < max_retries - 1:
+                rotate_key()
+                time.sleep(2)  # Longer pause for timeout
+                continue
+            else:
+                return None
+        except Exception as e:
+            logger.error(f"Exception calling Alpha Vantage API with key {api_key[:5]}...: {str(e)}")
+            if attempt < max_retries - 1:
+                rotate_key()
+                time.sleep(1)
+                continue
+            else:
+                return None
+    
+    return None
+
+def call_alpha_vantage_api(function: str, **params) -> Optional[Dict]:
+    """
+    Call the Alpha Vantage API with the given function and parameters
+    """
+    return call_alpha_vantage_api_with_retry(function, **params)
 
 def get_yahoo_finance_data(symbol: str) -> Optional[Dict]:
     """
@@ -217,42 +323,26 @@ def get_historical_data(symbol: str, outputsize: str = "compact", datatype: str 
     logger.info(f"Fetching historical data for symbol: {symbol}, outputsize: {outputsize}")
     
     try:
-        # Using the regular Alpha Vantage API
-        params = {
-            "function": "TIME_SERIES_DAILY",
-            "symbol": symbol,
-            "outputsize": outputsize,  # "compact" (last 100 days) or "full" (20+ years)
-            "datatype": datatype,
-            "apikey": ALPHA_VANTAGE_API_KEY
-        }
+        # Using the Alpha Vantage API with key rotation
+        result = call_alpha_vantage_api(
+            "TIME_SERIES_DAILY",
+            symbol=symbol,
+            outputsize=outputsize,  # "compact" (last 100 days) or "full" (20+ years)
+            datatype=datatype
+        )
         
-        logger.info(f"Making historical API request to: {ALPHA_VANTAGE_BASE_URL} with params: {params}")
-        
-        response = requests.get(ALPHA_VANTAGE_BASE_URL, params=params)
-        
-        logger.info(f"Historical API response status code: {response.status_code}")
-        logger.info(f"Historical API response text: {response.text}")
-        
-        if response.status_code == 200:
-            try:
-                data = response.json()
-                logger.info(f"Received historical data keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
-                
-                # Check if the response contains the expected data
-                if "Time Series (Daily)" in data:
-                    logger.info(f"Successfully fetched historical data for {symbol}")
-                    return data
-                else:
-                    # If the specific function isn't available, return None
-                    logger.warning(f"Historical data not available for symbol {symbol}: {data}")
-                    return None
-            except ValueError:
-                # Handle case where response is not JSON
-                logger.error(f"Historical response is not valid JSON for symbol {symbol}: {response.text}")
+        if result:
+            logger.info(f"Successfully fetched historical data for {symbol}")
+            # Check if the response contains the expected data
+            if "Time Series (Daily)" in result:
+                return result
+            else:
+                logger.warning(f"Historical data not available for symbol {symbol}: {result}")
                 return None
         else:
-            logger.error(f"Error fetching historical data for {symbol}: {response.status_code} - {response.text}")
+            logger.error(f"Failed to fetch historical data for {symbol}")
             return None
+            
     except Exception as e:
         logger.error(f"Exception occurred while fetching historical data for {symbol}: {str(e)}")
         return None

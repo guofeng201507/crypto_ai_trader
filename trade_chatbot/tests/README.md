@@ -8,6 +8,7 @@ This directory contains unit tests and integration tests for the trade chatbot a
 tests/
 ├── test_natural_language_processing.py  # Tests for natural language query interpretation
 ├── test_mcp_wrapper.py                   # Tests for Alpha Vantage MCP wrapper
+├── test_key_rotation.py                  # Tests for Alpha Vantage API key rotation
 ├── conftest.py                           # pytest configuration
 └── __init__.py                          # Package initialization
 ```
@@ -34,6 +35,7 @@ To run specific test files:
 cd trade_chatbot
 pytest tests/test_natural_language_processing.py
 pytest tests/test_mcp_wrapper.py
+pytest tests/test_key_rotation.py
 ```
 
 To run tests with coverage:
@@ -53,6 +55,11 @@ pytest tests/ --cov=backend --cov-report=html
 - `test_mcp_wrapper.py`: Tests for the Alpha Vantage MCP wrapper implementation
 - Verifies JSON-RPC 2.0 compliance and correct method routing
 
+### Key Rotation Tests
+- `test_key_rotation.py`: Tests for Alpha Vantage API key rotation system
+- Verifies that multiple API keys are properly rotated when rate limits are hit
+- Tests rate limit detection functionality
+
 ## Adding New Tests
 
 1. Create a new test file following the naming convention `test_*.py`
@@ -60,6 +67,7 @@ pytest tests/ --cov=backend --cov-report=html
    - `@pytest.mark.unit` for unit tests
    - `@pytest.mark.integration` for integration tests
    - `@pytest.mark.mcp` for MCP-related tests
+   - `@pytest.mark.key_rotation` for key rotation tests
 3. Follow the existing test structure and naming conventions
 4. Use mocks for external dependencies to ensure tests are isolated
 
