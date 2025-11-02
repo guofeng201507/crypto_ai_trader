@@ -195,6 +195,17 @@ npm run build
 
 3. Ensure environment variables are properly set in your production environment.
 
+## Testing
+
+The project includes comprehensive unit tests and integration tests. To run tests:
+
+```bash
+cd trade_chatbot
+pytest tests/
+```
+
+See `tests/README.md` for detailed testing instructions and test categories.
+
 ## License
 
 This project is licensed under the MIT License.
