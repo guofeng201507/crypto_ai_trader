@@ -19,3 +19,6 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "mcp: marks tests related to MCP functionality"
     )
+    config.addinivalue_line(
+        "markers", "key_rotation: marks tests related to API key rotation"
+    )
