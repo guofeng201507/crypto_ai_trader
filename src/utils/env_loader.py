@@ -1,18 +1,31 @@
-"""
-Environment variable loader utility.
+"""Environment variable loader utility.
+
+All modules use this utility to load from the root .env file.
 """
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 from loguru import logger
 
 
-def load_environment_variables(env_file: str = ".env"):
-    """
-    Load environment variables from a file.
+def get_project_root() -> Path:
+    """Find the project root directory (where .env is located)."""
+    current = Path(__file__).resolve()
+    # Go up from src/utils/env_loader.py to project root
+    return current.parent.parent.parent
+
+
+def load_environment_variables(env_file: str = None):
+    """Load environment variables from the root .env file.
     
     Args:
-        env_file: Path to the environment file
+        env_file: Optional path to env file. If None, uses project root .env
     """
+    if env_file is None:
+        # Always use root .env file
+        project_root = get_project_root()
+        env_file = project_root / ".env"
+    
     if os.path.exists(env_file):
         load_dotenv(env_file)
         logger.info(f"Environment variables loaded from {env_file}")

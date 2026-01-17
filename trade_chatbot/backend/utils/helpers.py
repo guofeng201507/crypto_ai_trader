@@ -315,7 +315,7 @@ def get_crypto_data(symbol: str, market: str = "USD") -> Optional[Dict]:
 
 def get_stock_data(symbol: str) -> Optional[Dict]:
     """
-    Get data for a given symbol (stock, crypto, or precious metals) using Yahoo Finance API as primary and MCP as fallback
+    Get data for a given symbol (stock, crypto, or precious metals) using Yahoo Finance API only
     """
     logger.info(f"Fetching data for symbol: {symbol}")
     
@@ -330,51 +330,25 @@ def get_stock_data(symbol: str) -> Optional[Dict]:
     # Handle precious metals symbols (e.g., XAUUSD, XAGUSD, etc.)
     if symbol_upper in precious_metals:
         logger.info(f"Detected precious metal symbol: {symbol}, using Yahoo Finance API directly")
-        yahoo_result = get_yahoo_finance_data(symbol_upper)
-        if yahoo_result:
-            return yahoo_result
-        else:
-            # Fallback to MCP server if Yahoo Finance fails
-            logger.info(f"Yahoo Finance failed for {symbol}, trying MCP server as fallback")
-            return get_mcp_data(symbol_upper)
+        return get_yahoo_finance_data(symbol_upper)
     
     # Check if it's a crypto symbol in the form BTC-USD, ETH-USD, etc.
     if '-' in symbol_upper and symbol_upper.split('-')[0] in crypto_symbols:
         logger.info(f"Detected cryptocurrency symbol in format: {symbol}, using crypto API")
-        result = get_crypto_data(symbol_upper.split('-')[0], symbol_upper.split('-')[1])  # Extract base and quote currencies
-        if result:
-            return result
-        else:
-            # Fallback to MCP server if Yahoo Finance fails
-            logger.info(f"Crypto data failed for {symbol}, trying MCP server as fallback")
-            return get_mcp_data(symbol_upper.split('-')[0])  # Use just the base currency for MCP
+        return get_crypto_data(symbol_upper.split('-')[0], symbol_upper.split('-')[1])  # Extract base and quote currencies
     
     # Check if the symbol is likely a cryptocurrency in short format (e.g., BTC, ETH)
     if symbol_upper in crypto_symbols:
         logger.info(f"Detected cryptocurrency symbol: {symbol}, using crypto API")
-        result = get_crypto_data(symbol_upper)
-        if result:
-            return result
-        else:
-            # Fallback to MCP server
-            logger.info(f"Crypto data failed for {symbol}, trying MCP server as fallback")
-            return get_mcp_data(symbol_upper)
+        return get_crypto_data(symbol_upper)
     
-    # For stocks and other symbols, use Yahoo Finance as primary
+    # For stocks and other symbols, use Yahoo Finance directly
     try:
         logger.info(f"Using Yahoo Finance API for symbol: {symbol}")
-        yahoo_result = get_yahoo_finance_data(symbol_upper)
-        if yahoo_result:
-            return yahoo_result
-        else:
-            # Fallback to MCP server if Yahoo Finance fails
-            logger.info(f"Yahoo Finance failed for {symbol}, trying MCP server as fallback")
-            return get_mcp_data(symbol_upper)
+        return get_yahoo_finance_data(symbol_upper)
     except Exception as e:
         logger.error(f"Exception occurred while fetching data for {symbol} from Yahoo Finance: {str(e)}")
-        # Fallback to MCP server if Yahoo Finance fails
-        logger.info(f"Trying MCP server as fallback for {symbol}")
-        return get_mcp_data(symbol_upper)
+        return None
 
 def get_historical_data(symbol: str, outputsize: str = "compact", datatype: str = "json") -> Optional[Dict]:
     """
@@ -536,3 +510,7 @@ def get_mcp_data(symbol: str) -> Optional[Dict]:
         import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
         return None
+
+
+# Removed get_mcp_data function to eliminate Alpha Vantage fallback logic
+# All data retrieval now uses Yahoo Finance as the sole source

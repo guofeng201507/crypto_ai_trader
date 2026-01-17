@@ -1,7 +1,6 @@
-"""
-Chat API endpoints for the trade chatbot
-"""
+"""Chat API endpoints for the trade chatbot."""
 from flask import Blueprint, request, jsonify
+from pathlib import Path
 from ..context_engine.context_manager import ContextManager
 from ..utils.helpers import get_stock_data
 from ..config.prompts import FINANCIAL_KEYWORDS, INTERPRETATION_PROMPT_TEMPLATE, ASSET_INFO_PROMPT_TEMPLATE, STOCK_INFO_PROMPT_TEMPLATE, FALLBACK_PROMPT_TEMPLATE, NO_SYMBOL_PROMPT_TEMPLATE, GENERAL_CHAT_PROMPT_TEMPLATE
@@ -17,8 +16,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from root .env
+project_root = Path(__file__).resolve().parent.parent.parent.parent
+load_dotenv(project_root / ".env")
 
 # Configure Qwen API
 qwen_api_key = os.environ.get("QWEN_API_KEY")

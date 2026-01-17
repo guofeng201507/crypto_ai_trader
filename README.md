@@ -119,6 +119,50 @@ Edit `config/news_monitor_config.yaml` to customize:
 - scikit-learn/tensorflow: Machine learning
 - ta: Technical analysis indicators
 - matplotlib/seaborn: Data visualization
+- pytest: Testing framework
+- requests: HTTP library
+- loguru: Advanced logging
+
+## Testing
+
+Comprehensive unit tests are available for all monitoring modules:
+
+### Run All Tests
+```bash
+# Run all module tests
+python run_all_tests.py
+
+# Or use pytest directly
+python -m pytest -v
+
+# Run with coverage report
+python -m pytest --cov=. --cov-report=html
+```
+
+### Run Individual Module Tests
+```bash
+# Price monitor tests
+python -m pytest crypto_price_monitor/tests/ -v
+
+# News monitor tests
+python -m pytest crypto_news_monitor/tests/ -v
+
+# Orderbook monitor tests
+python -m pytest crypto_orderbook_monitor/tests/ -v
+
+# Futures monitor tests
+python -m pytest crypto_futures_monitor/tests/ -v
+
+# Core strategies tests
+python -m pytest tests/ -v
+```
+
+### Test Structure
+- `crypto_price_monitor/tests/` - Tests for 3-month high tracker
+- `crypto_news_monitor/tests/` - Tests for news monitoring
+- `crypto_orderbook_monitor/tests/` - Tests for orderbook monitoring
+- `crypto_futures_monitor/tests/` - Tests for futures monitoring
+- `tests/` - Tests for core trading strategies
 
 ## Disclaimer
 

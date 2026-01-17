@@ -1,168 +1,149 @@
-"""
-MCP (Model Context Protocol) server wrapper for Alpha Vantage API
-This module provides an MCP-compatible interface that wraps the standard Alpha Vantage API
+"""MCP (Model Context Protocol) server wrapper for financial data APIs.
 
-Supported MCP Methods:
----------------------
-1. av.function.global_quote
-   - Get real-time quote data for stocks, ETFs, mutual funds, etc.
-   - Parameters: symbol (required)
-   
-2. av.function.time_series_daily
-   - Get daily time series data (open, high, low, close, volume)
-   - Parameters: symbol (required), outputsize (optional)
-   
-3. av.function.symbol_search
-   - Search for stock symbols by keywords
-   - Parameters: keywords (required)
-   
-4. av.function.currency_exchange_rate
-   - Get real-time exchange rates between currencies
-   - Parameters: from_currency (required), to_currency (optional)
-   
-5. av.function.crypto_overview
-   - Get cryptocurrency exchange rates
-   - Parameters: symbol (required), market (optional)
-   
-6. av.function.news_sentiment
-   - Get live news sentiment and anomaly detection
-   - Parameters: tickers (optional), topics (optional), time_from (optional), 
-                time_to (optional), sort (optional), limit (optional)
-
-All methods follow JSON-RPC 2.0 specification with automatic key rotation
-for rate limit protection.
+This module provides an MCP-compatible interface that wraps financial data APIs.
+Currently uses Yahoo Finance as the primary data source.
 """
 import requests
 import os
+from pathlib import Path
 from flask import Blueprint, request, jsonify
 from dotenv import load_dotenv
 import logging
 import json
 import time
 from typing import Optional, Dict
+from datetime import datetime
 
-# Load environment variables
-load_dotenv()
-
-# Import key manager for API key rotation
-from ..utils.key_manager import (
-    initialize_key_manager,
-    get_current_key,
-    rotate_key,
-    mark_key_usage,
-    is_rate_limited_response
-)
+# Load environment variables from root .env
+project_root = Path(__file__).resolve().parent.parent.parent.parent
+load_dotenv(project_root / ".env")
 
 logger = logging.getLogger(__name__)
 
-# Configure Alpha Vantage API
-ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query'
-
-# Initialize key manager with multiple API keys from environment variable
-api_keys_env = os.environ.get('ALPHA_VANTAGE_API_KEYS', '20KCRQCE82CTCDVI,8DW7GH8FIZDXGFHC')
-api_keys = [key.strip() for key in api_keys_env.split(',') if key.strip()]
-initialize_key_manager(api_keys)
+# Configure Yahoo Finance API
+YAHOO_FINANCE_BASE_URL = 'https://query1.finance.yahoo.com/v8/finance/chart/'
 
 # Create the MCP wrapper blueprint
 mcp_wrapper_bp = Blueprint('mcp_wrapper', __name__)
 
-def call_standard_alpha_vantage_api_with_retry(function, max_retries=3, **params):
+def get_yahoo_finance_data(symbol: str) -> Optional[Dict]:
     """
-    Call the standard Alpha Vantage API with the given function and parameters
-    with automatic key rotation on rate limit errors
+    Get stock or cryptocurrency data for a given symbol using Yahoo Finance API
+    """
+    logger.info(f"Fetching data for symbol: {symbol} from Yahoo Finance")
     
-    Args:
-        function: Alpha Vantage API function name
-        max_retries: Maximum number of retries with different keys
-        **params: Additional parameters for the API call
+    try:
+        # Using Yahoo Finance API
+        url = f"{YAHOO_FINANCE_BASE_URL}{symbol}"
         
-    Returns:
-        API response data or None if all retries fail
-    """
-    for attempt in range(max_retries):
-        # Get current API key
-        api_key = get_current_key()
-        logger.info(f"Attempt {attempt + 1}/{max_retries} with API key: {api_key[:5]}...")
-        
-        api_params = {
-            'function': function,
-            'apikey': api_key,
-            **params
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
         
-        try:
-            response = requests.get(ALPHA_VANTAGE_BASE_URL, params=api_params, timeout=30)
-            
-            if response.status_code == 200:
-                try:
-                    data = response.json()
+        params = {
+            "range": "1d",
+            "interval": "1m"
+        }
+        
+        logger.info(f"Making Yahoo Finance API request to: {url} with params: {params}")
+        
+        response = requests.get(url, params=params, headers=headers)
+        
+        logger.info(f"Yahoo Finance API response status code: {response.status_code}")
+        
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                logger.info(f"Yahoo Finance API response: {data}")
+                
+                # Check if the response contains the expected data
+                if "chart" in data and "result" in data["chart"] and len(data["chart"]["result"]) > 0:
+                    result = data["chart"]["result"][0]
                     
-                    # Mark successful usage
-                    mark_key_usage(api_key)
+                    # Extract metadata
+                    meta = result.get("meta", {})
                     
-                    # Check if we hit a rate limit
-                    if is_rate_limited_response(data):
-                        logger.warning(f"Rate limit detected with key {api_key[:5]}... on attempt {attempt + 1}")
-                        if attempt < max_retries - 1:  # Not the last attempt
-                            # Rotate to next key and try again
-                            new_key = rotate_key()
-                            logger.info(f"Rotating to next key: {new_key[:5]}...")
-                            time.sleep(1)  # Brief pause before retry
-                            continue
-                        else:
-                            logger.error("All API keys exhausted, rate limit still hit")
-                            return data  # Return the rate limit response
-                    else:
-                        # Successful response
-                        logger.info(f"Successful API call with key {api_key[:5]}...")
-                        return data
+                    # Extract the latest quote data
+                    if "indicators" in result and "quote" in result["indicators"] and len(result["indicators"]["quote"]) > 0:
+                        quote = result["indicators"]["quote"][0]
                         
-                except ValueError:
-                    logger.error(f"Response from Alpha Vantage is not valid JSON: {response.text}")
-                    if attempt < max_retries - 1:
-                        rotate_key()
-                        time.sleep(1)
-                        continue
+                        # Get the latest non-null values
+                        latest_index = -1
+                        latest_price = None
+                        latest_volume = None
+                        
+                        # Find the latest valid data point
+                        for i in range(len(quote.get("close", [])) - 1, -1, -1):
+                            if quote.get("close", [])[i] is not None:
+                                latest_index = i
+                                latest_price = float(quote.get("close", [])[i])
+                                latest_volume = int(quote.get("volume", [])[i] or 0)
+                                break
+                        
+                        if latest_price is not None:
+                            result_data = {
+                                "symbol": meta.get("symbol"),
+                                "price": latest_price,
+                                "open": float(meta.get("previousClose", 0)),
+                                "high": float(max([x for x in quote.get("high", []) if x is not None]) if quote.get("high") else 0),
+                                "low": float(min([x for x in quote.get("low", []) if x is not None]) if quote.get("low") else 0),
+                                "volume": latest_volume,
+                                "latest_trading_day": datetime.fromtimestamp(meta.get("regularMarketTime", 0)).strftime('%Y-%m-%d'),
+                                "previous_close": float(meta.get("previousClose", 0)),
+                                "change": latest_price - float(meta.get("previousClose", 0)),
+                                "change_percent": ((latest_price - float(meta.get("previousClose", 0))) / float(meta.get("previousClose", 1)) * 100) if meta.get("previousClose") else 0,
+                                "summary": f"Price: ${latest_price:.2f} "
+                                          f"Change: ${latest_price - float(meta.get('previousClose', 0)):.2f} "
+                                          f"({((latest_price - float(meta.get('previousClose', 0))) / float(meta.get('previousClose', 1)) * 100):.2f}%)"
+                            }
+                            
+                            logger.info(f"Successfully parsed Yahoo Finance data for {symbol}: {result_data}")
+                            return result_data
+                        else:
+                            logger.warning(f"No valid price data found for symbol {symbol}")
+                            return None
                     else:
+                        logger.warning(f"No quote data available for symbol {symbol}: {result}")
                         return None
-            else:
-                logger.error(f"Error from Alpha Vantage API: {response.status_code} - {response.text}")
-                if attempt < max_retries - 1:
-                    rotate_key()
-                    time.sleep(1)
-                    continue
                 else:
+                    # If the specific function isn't available, return None
+                    logger.warning(f"Data not available for symbol {symbol}: {data}")
                     return None
-                    
-        except requests.exceptions.Timeout:
-            logger.error(f"Timeout calling Alpha Vantage API with key {api_key[:5]}...")
-            if attempt < max_retries - 1:
-                rotate_key()
-                time.sleep(2)  # Longer pause for timeout
-                continue
-            else:
+            except ValueError:
+                # Handle case where response is not JSON
+                logger.error(f"Yahoo Finance response is not valid JSON for symbol {symbol}: {response.text}")
                 return None
-        except Exception as e:
-            logger.error(f"Exception calling Alpha Vantage API with key {api_key[:5]}...: {str(e)}")
-            if attempt < max_retries - 1:
-                rotate_key()
-                time.sleep(1)
-                continue
-            else:
-                return None
-    
-    return None
+        else:
+            logger.error(f"Error fetching data from Yahoo Finance for {symbol}: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        logger.error(f"Exception occurred while fetching data from Yahoo Finance for {symbol}: {str(e)}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        return None
 
-def call_standard_alpha_vantage_api(function, **params):
+def get_crypto_data(symbol: str, market: str = "USD") -> Optional[Dict]:
     """
-    Call the standard Alpha Vantage API with the given function and parameters
+    Get cryptocurrency data for a given symbol using Yahoo Finance API
+    Convert common crypto symbols to Yahoo Finance format (e.g., BTC -> BTC-USD)
     """
-    return call_standard_alpha_vantage_api_with_retry(function, **params)
+    logger.info(f"Fetching cryptocurrency data for symbol: {symbol}, market: {market}")
+    
+    # Convert symbol to Yahoo Finance format
+    if "-" in symbol and ("USD" in symbol or "BTC" in symbol or "ETH" in symbol or "EUR" in symbol or "GBP" in symbol):
+        # Already in the correct format (e.g., BTC-USD)
+        yahoo_symbol = symbol
+    else:
+        # Need to format it (e.g., BTC to BTC-USD)
+        yahoo_symbol = f"{symbol}-{market}"
+    
+    return get_yahoo_finance_data(yahoo_symbol)
 
 @mcp_wrapper_bp.route('/', methods=['POST'])
 def mcp_handler():
     """
-    MCP server endpoint that handles JSON-RPC requests for Alpha Vantage data
+    MCP server endpoint that handles JSON-RPC requests for financial data
+    Currently only supports Yahoo Finance as the data source
     """
     try:
         # Parse the JSON-RPC request
@@ -193,7 +174,7 @@ def mcp_handler():
         result = None
         
         if method == 'av.function.global_quote':
-            # Handle global quote request
+            # Handle global quote request using Yahoo Finance
             symbol = params.get('symbol')
             if not symbol:
                 return jsonify({
@@ -202,10 +183,10 @@ def mcp_handler():
                     "id": req_id
                 }), 400
             
-            result = call_standard_alpha_vantage_api('GLOBAL_QUOTE', symbol=symbol)
+            result = get_yahoo_finance_data(symbol)
             
         elif method == 'av.function.time_series_daily':
-            # Handle time series daily request
+            # Handle time series daily request using Yahoo Finance
             symbol = params.get('symbol')
             if not symbol:
                 return jsonify({
@@ -215,10 +196,10 @@ def mcp_handler():
                 }), 400
             
             outputsize = params.get('outputsize', 'compact')
-            result = call_standard_alpha_vantage_api('TIME_SERIES_DAILY', symbol=symbol, outputsize=outputsize)
+            result = get_yahoo_finance_data(symbol)  # Simplified for now
             
         elif method == 'av.function.symbol_search':
-            # Handle symbol search request
+            # Handle symbol search request - not implemented for Yahoo Finance
             keywords = params.get('keywords')
             if not keywords:
                 return jsonify({
@@ -227,10 +208,14 @@ def mcp_handler():
                     "id": req_id
                 }), 400
             
-            result = call_standard_alpha_vantage_api('SYMBOL_SEARCH', keywords=keywords)
+            # For now, return a simple response indicating this is not implemented
+            result = {
+                "Information": "Symbol search not implemented for Yahoo Finance in this MCP wrapper",
+                "Keywords": keywords
+            }
             
         elif method == 'av.function.currency_exchange_rate':
-            # Handle currency exchange rate request
+            # Handle currency exchange rate request using Yahoo Finance
             from_currency = params.get('from_currency')
             to_currency = params.get('to_currency', 'USD')
             
@@ -241,12 +226,16 @@ def mcp_handler():
                     "id": req_id
                 }), 400
             
-            result = call_standard_alpha_vantage_api('CURRENCY_EXCHANGE_RATE', 
-                                                    from_currency=from_currency, 
-                                                    to_currency=to_currency)
-                                                    
+            # Format the currency pair for Yahoo Finance (e.g., EURUSD=X)
+            if to_currency == 'USD':
+                yahoo_symbol = f"{from_currency}{to_currency}=X"
+            else:
+                yahoo_symbol = f"{from_currency}{to_currency}=X"
+            
+            result = get_yahoo_finance_data(yahoo_symbol)
+            
         elif method == 'av.function.crypto_overview':
-            # Handle crypto overview request
+            # Handle crypto overview request using Yahoo Finance
             symbol = params.get('symbol')
             if not symbol:
                 return jsonify({
@@ -256,57 +245,21 @@ def mcp_handler():
                 }), 400
             
             market = params.get('market', 'USD')
-            result = call_standard_alpha_vantage_api('CURRENCY_EXCHANGE_RATE', 
-                                                    from_currency=symbol, 
-                                                    to_currency=market)
-                                                    
+            # Format the crypto symbol for Yahoo Finance (e.g., BTC-USD)
+            yahoo_symbol = f"{symbol}-{market}"
+            result = get_yahoo_finance_data(yahoo_symbol)
+            
         elif method == 'av.function.news_sentiment':
-            # Handle news sentiment request
+            # Handle news sentiment request - not implemented for Yahoo Finance
             tickers = params.get('tickers')
             topics = params.get('topics')
-            time_from = params.get('time_from')
-            time_to = params.get('time_to')
-            sort = params.get('sort', 'LATEST')
-            limit = params.get('limit', 50)
             
-            # Build parameters for news sentiment API call
-            news_params = {}
-            if tickers:
-                news_params['tickers'] = tickers
-            if topics:
-                news_params['topics'] = topics
-            if time_from:
-                news_params['time_from'] = time_from
-            if time_to:
-                news_params['time_to'] = time_to
-            if sort:
-                news_params['sort'] = sort
-            if limit:
-                news_params['limit'] = limit
-                
-            result = call_standard_alpha_vantage_api('NEWS_SENTIMENT', **news_params)
-            
-            # Format the response to be more concise (under 150 words)
-            if result and "feed" in result:
-                # Get just the first few news items for a concise response
-                feed_items = result["feed"][:3]  # Limit to first 3 items
-                concise_response = {
-                    "symbol": params.get("tickers", params.get("topics", "NEWS")),
-                    "total_articles": len(result["feed"]),
-                    "latest_articles": []
-                }
-                
-                for item in feed_items:
-                    # Create a concise summary of each article
-                    article_summary = {
-                        "title": item.get("title", "")[:50] + "..." if len(item.get("title", "")) > 50 else item.get("title", ""),
-                        "sentiment": item.get("overall_sentiment_label", "Neutral"),
-                        "score": round(float(item.get("overall_sentiment_score", 0)), 2),
-                        "published": item.get("time_published", "")[:16] if item.get("time_published") else "N/A"
-                    }
-                    concise_response["latest_articles"].append(article_summary)
-                    
-                result = concise_response
+            # For now, return a simple response indicating this is not implemented
+            result = {
+                "Information": "News sentiment not implemented for Yahoo Finance in this MCP wrapper",
+                "Tickers": tickers,
+                "Topics": topics
+            }
             
         else:
             # Unknown method
@@ -326,7 +279,7 @@ def mcp_handler():
         else:
             return jsonify({
                 "jsonrpc": "2.0",
-                "error": {"code": -32603, "message": "Internal error calling Alpha Vantage API"},
+                "error": {"code": -32603, "message": "Internal error calling financial data API"},
                 "id": req_id
             }), 500
     
