@@ -1,10 +1,11 @@
-"""
-MCP API endpoints for the trade chatbot
-This module provides endpoints for interacting with the Alpha Vantage MCP server
+"""MCP API endpoints for the trade chatbot.
+
+This module provides endpoints for interacting with the Alpha Vantage MCP server.
 """
 import requests
 import os
 import json
+from pathlib import Path
 from flask import Blueprint, request, jsonify
 from dotenv import load_dotenv
 import logging
@@ -16,8 +17,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from root .env
+project_root = Path(__file__).resolve().parent.parent.parent.parent
+load_dotenv(project_root / ".env")
 
 mcp_bp = Blueprint('mcp', __name__)
 

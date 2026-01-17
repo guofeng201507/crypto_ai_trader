@@ -23,8 +23,8 @@ logging.basicConfig(
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from root .env file
+load_dotenv(project_root / ".env")
 
 def create_app():
     app = Flask(__name__)

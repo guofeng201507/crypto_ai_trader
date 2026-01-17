@@ -1,11 +1,13 @@
-"""
-Configuration for the trade chatbot
-"""
+"""Configuration for the trade chatbot."""
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Get project root (3 levels up from backend/config.py)
+project_root = Path(__file__).resolve().parent.parent.parent
+
+# Load environment variables from root .env file
+load_dotenv(project_root / ".env")
 
 # Alpha Vantage Configuration
 # Support for multiple API keys with rotation to handle rate limits
