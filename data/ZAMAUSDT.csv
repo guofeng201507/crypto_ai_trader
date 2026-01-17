@@ -1,0 +1,4 @@
+timestamp,mark_price,index_price,basis,basis_percent,last_funding_rate,oi,long_short_account_ratio,top_trader_account_ls_ratio,top_trader_position_ls_ratio,taker_buy_sell_ratio
+2026-01-17T07:04:59.107162+00:00,0.077582,0.077582,0.0,0.0,5e-05,68703211.0,0.8811,0.8591,1.3495,0.7256
+2026-01-17T07:12:16.397642+00:00,0.077785,0.077785,0.0,0.0,5e-05,68753497.0,0.8741,0.8584,1.3473,1.4071
+2026-01-17T07:19:19.589539+00:00,0.078424,0.078424,0.0,0.0,5e-05,68917912.0,0.8755,0.8577,1.3484,0.9044
