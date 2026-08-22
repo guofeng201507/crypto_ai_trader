@@ -19,9 +19,9 @@ from utils.env_loader import load_environment_variables
 
 # Import exchange connectors from orderbook monitor
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'crypto_orderbook_monitor'))
-from src.exchanges.binance import BinanceExchange
-from src.exchanges.okx import OkxExchange
-from src.exchanges.coinbase import CoinbaseExchange
+from crypto_orderbook_monitor.src.exchanges.binance import BinanceExchange
+from crypto_orderbook_monitor.src.exchanges.okx import OkxExchange
+from crypto_orderbook_monitor.src.exchanges.coinbase import CoinbaseExchange
 
 
 class ScalpingBot:

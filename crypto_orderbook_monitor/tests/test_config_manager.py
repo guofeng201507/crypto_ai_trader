@@ -5,7 +5,7 @@ import unittest
 import os
 import tempfile
 import yaml
-from src.utils.config_manager import ConfigManager
+from crypto_orderbook_monitor.src.utils.config_manager import ConfigManager
 
 
 class TestConfigManager(unittest.TestCase):

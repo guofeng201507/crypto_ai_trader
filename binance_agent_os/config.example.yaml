@@ -1,0 +1,15 @@
+# Opt-in gateway. OAuth tokens are never stored in this YAML file.
+enabled: false
+endpoint: https://agent.binance.com/mcp/agentic
+timeout_seconds: 20
+policy:
+  public_market_data_only: true
+  require_mcp_read_only_hint: true
+  account_access: false
+  trading: false
+  transfers: false
+  withdrawals: false
+oauth:
+  # Supply the client id through BINANCE_MCP_CLIENT_ID, not this file.
+  redirect_uri: http://127.0.0.1:5001/api/binance-mcp/oauth/callback
+  token_storage: memory

@@ -45,6 +45,10 @@ class ConfigManager:
         except yaml.YAMLError as e:
             logger.error(f"Error parsing YAML in config file {self.config_file}: {e}")
             raise Exception(f"Error parsing YAML in config file {self.config_file}: {e}")
+        except ValueError:
+            # Validation errors are part of the public contract and should not be
+            # obscured behind a generic configuration exception.
+            raise
         except Exception as e:
             logger.error(f"Error loading config file {self.config_file}: {e}")
             raise Exception(f"Error loading config file {self.config_file}: {e}")

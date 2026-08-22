@@ -13,6 +13,7 @@ from qlib.data.dataset import DatasetH
 from qlib.data.dataset.handler import DataHandlerLP
 from qlib.contrib.data.handler import Alpha158
 import ccxt
+from integrations.legacy_data_fetcher import LegacyDataFetcher
 from datetime import datetime, timedelta
 import logging
 from loguru import logger
@@ -31,7 +32,8 @@ class CryptoDataProcessor:
             config_path: Path to the configuration file
         """
         self.config = self._load_config(config_path)
-        self.exchanges = self._init_exchanges()
+        self.data_fetcher = LegacyDataFetcher(self.config['exchanges'])
+        self.exchanges = self.data_fetcher.exchanges
         
     def _load_config(self, config_path: str):
         """
@@ -77,24 +79,12 @@ class CryptoDataProcessor:
         Returns:
             DataFrame with OHLCV data
         """
-        exchange = self.exchanges[exchange_name]
-        
-        # Convert dates to milliseconds
-        start_timestamp = int(datetime.strptime(start_date, '%Y-%m-%d').timestamp() * 1000)
-        end_timestamp = int(datetime.strptime(end_date, '%Y-%m-%d').timestamp() * 1000)
-        
-        # Fetch OHLCV data
-        ohlcv = exchange.fetch_ohlcv(
-            symbol=symbol,
-            timeframe=timeframe,
-            since=start_timestamp,
-            limit=10000  # Adjust as needed
+        start = datetime.strptime(start_date, '%Y-%m-%d')
+        end = datetime.strptime(end_date, '%Y-%m-%d')
+        days = max(1, (end - start).days + 1)
+        df = self.data_fetcher.fetch_historical_data(
+            exchange_name, symbol, days=days, timeframe=timeframe
         )
-        
-        # Convert to DataFrame
-        df = pd.DataFrame(ohlcv, columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
-        df['datetime'] = pd.to_datetime(df['datetime'], unit='ms')
-        df.set_index('datetime', inplace=True)
         
         # Filter by date range
         df = df[(df.index >= start_date) & (df.index <= end_date)]

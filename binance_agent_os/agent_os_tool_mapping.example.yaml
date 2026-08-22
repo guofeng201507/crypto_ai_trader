@@ -1,0 +1,22 @@
+# Verified against the authenticated Binance MCP inventory on 2026-08-22.
+# These mappings are read-only. Account/trade/transfer tools are intentionally absent.
+capabilities:
+  ticker: spot.tickerPrice
+  ticker_24h: spot.ticker24hr
+  ohlcv: spot.klines
+  order_book: spot.depth
+  futures_exchange_info: futures_usds.exchangeInformation
+  funding: futures_usds.markPrice
+  funding_history: futures_usds.getFundingRateHistory
+  open_interest: futures_usds.openInterest
+  open_interest_statistics: futures_usds.openInterestStatistics
+  long_short_ratio: futures_usds.longShortRatio
+  top_trader_account_ratio: futures_usds.topTraderLongShortRatioAccounts
+  top_trader_position_ratio: futures_usds.topTraderLongShortRatioPositions
+  taker_buy_sell_ratio: futures_usds.takerBuySellVolume
+
+# Populate only after this standalone application completes its own OAuth flow
+# and verifies the exact tools/list names and readOnlyHint annotations.
+account_capabilities:
+  account_spot_balances: ""
+  account_futures_balances: ""

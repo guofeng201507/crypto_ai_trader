@@ -12,6 +12,7 @@ import os
 import sys
 from pathlib import Path
 import logging
+import secrets
 
 # Set up logging to capture all errors
 logging.basicConfig(
@@ -33,7 +34,9 @@ def create_app():
     CORS(app)
     
     # Configuration
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
+    # Use an ephemeral high-entropy key for local development instead of a known
+    # default. Production/multi-process deployments must set the same SECRET_KEY.
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
     app.config['ALPHA_VANTAGE_API_KEY'] = os.environ.get(
         'ALPHA_VANTAGE_API_KEY', 
         '20KCRQCE82CTCDVI'  # Default key from MCP server
@@ -44,11 +47,13 @@ def create_app():
     from trade_chatbot.backend.api.data import data_bp
     from trade_chatbot.backend.api.mcp import mcp_bp
     from trade_chatbot.backend.api.mcp_wrapper import mcp_wrapper_bp
+    from trade_chatbot.backend.api.binance_mcp import binance_mcp_bp
     
     app.register_blueprint(chat_bp, url_prefix='/api')
     app.register_blueprint(data_bp, url_prefix='/api')
     app.register_blueprint(mcp_bp, url_prefix='/api/mcp')
     app.register_blueprint(mcp_wrapper_bp, url_prefix='/api/mcp_wrapper')  # This will be our new MCP-compatible endpoint
+    app.register_blueprint(binance_mcp_bp, url_prefix='/api/binance-mcp')
     
     return app
 

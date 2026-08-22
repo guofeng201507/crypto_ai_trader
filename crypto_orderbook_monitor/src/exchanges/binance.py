@@ -5,6 +5,8 @@ import ccxt.async_support as ccxt
 import asyncio
 from .base_exchange import BaseExchange
 from loguru import logger
+from integrations.adapters import CCXTOrderBookAdapter
+from integrations.domain import CanonicalSymbol
 
 
 class BinanceExchange(BaseExchange):
@@ -17,6 +19,7 @@ class BinanceExchange(BaseExchange):
             'enableRateLimit': True,
             'timeout': 10000,  # 10 second timeout
         })
+        self.adapter = CCXTOrderBookAdapter("binance", self.exchange)
     
     async def fetch_orderbook(self, symbol):
         """
@@ -32,16 +35,8 @@ class BinanceExchange(BaseExchange):
             Exception: If there's an error fetching the orderbook
         """
         try:
-            # Validate symbol exists
-            if not self.exchange.markets:
-                await self.exchange.load_markets()
-            
-            if symbol not in self.exchange.markets:
-                raise ValueError(f"Symbol {symbol} not available on Binance")
-            
-            # Fetch orderbook with limit to reduce data size
-            orderbook = await self.exchange.fetch_order_book(symbol, limit=50)
-            return orderbook
+            snapshot = await self.adapter.get_order_book(CanonicalSymbol.parse(symbol), depth=50)
+            return dict(snapshot.raw)
         except ccxt.NetworkError as e:
             logger.error(f"Binance network error for {symbol}: {str(e)}")
             raise Exception(f"Binance network error: {str(e)}")

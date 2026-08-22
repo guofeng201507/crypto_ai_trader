@@ -24,6 +24,8 @@ from loguru import logger
 # Add parent directory to path to import utilities
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from src.utils.env_loader import get_env_variable, load_environment_variables
+from integrations.adapters import BinanceFuturesMetricsAdapter
+from integrations.domain import CanonicalSymbol, MarketType
 
 
 BINANCE_FAPI_BASE = "https://fapi.binance.com"
@@ -54,6 +56,7 @@ class BinanceFuturesMonitor:
     def __init__(self) -> None:
         load_environment_variables()
         self.session = requests.Session()
+        self.futures_adapter = BinanceFuturesMetricsAdapter(self.session)
         self.symbol_states: Dict[str, SymbolState] = {}
 
         os.makedirs(DATA_DIR, exist_ok=True)
@@ -72,17 +75,7 @@ class BinanceFuturesMonitor:
         """Fetch all USDT-margined perpetual contract symbols from Binance Futures."""
         url = f"{BINANCE_FAPI_BASE}/fapi/v1/exchangeInfo"
         try:
-            resp = self.session.get(url, timeout=10)
-            resp.raise_for_status()
-            data = resp.json()
-            symbols = []
-            for s in data.get("symbols", []):
-                if (
-                    s.get("contractType") == "PERPETUAL"
-                    and s.get("quoteAsset") == "USDT"
-                    and s.get("status") == "TRADING"
-                ):
-                    symbols.append(s["symbol"])
+            symbols = [item.binance() for item in self.futures_adapter.list_usdt_perpetual_symbols()]
             logger.info(f"Fetched {len(symbols)} USDT perpetual symbols")
             return symbols
         except Exception as e:
@@ -93,9 +86,10 @@ class BinanceFuturesMonitor:
         """Get mark price, index price, and last funding rate."""
         url = f"{BINANCE_FAPI_BASE}/fapi/v1/premiumIndex"
         try:
-            resp = self.session.get(url, params={"symbol": symbol}, timeout=5)
-            resp.raise_for_status()
-            return resp.json()
+            snapshot = self.futures_adapter.get_funding(
+                CanonicalSymbol.parse(symbol, MarketType.FUTURES)
+            )
+            return dict(snapshot.raw)
         except Exception as e:
             logger.error(f"Failed to fetch premiumIndex for {symbol}: {e}")
             return None
@@ -103,10 +97,9 @@ class BinanceFuturesMonitor:
     def fetch_open_interest(self, symbol: str) -> Optional[float]:
         url = f"{BINANCE_FAPI_BASE}/fapi/v1/openInterest"
         try:
-            resp = self.session.get(url, params={"symbol": symbol}, timeout=5)
-            resp.raise_for_status()
-            data = resp.json()
-            return float(data.get("openInterest"))
+            return self.futures_adapter.get_open_interest(
+                CanonicalSymbol.parse(symbol, MarketType.FUTURES)
+            ).open_interest
         except Exception as e:
             logger.error(f"Failed to fetch openInterest for {symbol}: {e}")
             return None
@@ -120,12 +113,12 @@ class BinanceFuturesMonitor:
         url = f"{BINANCE_FAPI_BASE}/futures/data/{endpoint}"
         params = {"symbol": symbol, "period": RATIO_PERIOD, "limit": 1}
         try:
-            resp = self.session.get(url, params=params, timeout=5)
-            resp.raise_for_status()
-            data = resp.json()
-            if isinstance(data, list) and data:
-                val = data[-1].get(value_key)
-                return float(val) if val is not None else None
+            return self.futures_adapter.get_ratio(
+                endpoint,
+                CanonicalSymbol.parse(symbol, MarketType.FUTURES),
+                value_key,
+                period=RATIO_PERIOD,
+            )
         except Exception as e:
             logger.error(f"Failed to fetch {endpoint} for {symbol}: {e}")
         return None
